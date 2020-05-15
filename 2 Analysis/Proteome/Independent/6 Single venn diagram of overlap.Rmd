@@ -1,0 +1,163 @@
+---
+title: "Venn diagram for WT + CKO"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 6 - DESCRIPTION
+#
+# Here we find out which proteins are rhythmic in WT but not CKO and vice versa. 
+# We also find the overlap, i.e. which proteins are rhythmic in both genotypes.
+#
+# We are also loading the original raw file - this is so that we can make a background list, i.e. all proteins present in the experiment, even if they are only found in one genotype.
+#
+# INPUTS = normalised data for biologically significantly rhythmic proteins (.csv), raw data file from Perseus (.txt)
+# OUTPUTS = Venn diagrams (.pdf), subsets of interest and background proteome (.csv)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("VennDiagram")) {
+  install.packages("VennDiagram", dependencies = TRUE)
+  library(VennDiagram)
+} 
+
+# Make a list of all the .csv and .txt files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+Y = list.files(".",".txt")
+
+# read the raw data file
+data_start <- read_tsv("CRM3962_6set_MQ1633C_prot_noFil_m8.txt", na = c("NaN"), quoted_na = TRUE)
+data_start <- data_start[-1,] # Remove the first row which is just junk
+# Make the data numeric
+data_start[, c(1:60)] <- sapply(data_start[, (1:60)], as.numeric)
+#Infer missing values for CKO sample 12
+missing_data <- apply(cbind(data_start[,13], data_start[,15]), 1, mean)
+data_start <- cbind(data_start[1:13], missing_data, data_start[15:ncol(data_start)])
+# Remove rows which contain NaN within the data columns
+data_start <- data_start[rowSums(is.na(data_start[, 1:60])) == 0,]
+
+# Clean up majority protein IDs
+proteins <- as.vector(data_start$`Majority protein IDs`)
+# Create empty vector
+protein_id <- vector("list", length(proteins))
+# For loop to either print the name or separate them if there are several in one line
+for (i in 1:length(proteins)) {
+  protein_id[i] <- strsplit(proteins[i], ";")
+}
+# Select only the first element on each line --> this is the main protein for each line then attach it to the first column of the total proteome dataframe
+protein_ids <- unlist(lapply(protein_id, '[[', 1))
+data_start$uniprot <- protein_ids
+
+uniprot = as.list(data_start$uniprot)
+uniprot <- unlist(uniprot)
+gene_names = as.list(data_start$`Gene names`)
+gene_names <- unlist(gene_names)
+
+WT_data <- read_csv("WT_big_hits.csv", col_names = TRUE)
+
+CKO_data <- read_csv("CKO_big_hits.csv", col_names = TRUE)
+
+```
+
+```{r}
+#List of intersected proteins
+
+common_uniprot <- intersect(CKO_data$Uniprot_ID, WT_data$Uniprot_ID)
+common_genes <- intersect(CKO_data$Gene_names, WT_data$Gene_names)
+common_proteins <- intersect(CKO_data$Protein_names, WT_data$Protein_names)
+
+common_list <- cbind(common_uniprot, common_proteins, common_genes)
+common_list <- as.data.frame(common_list)
+
+# Select pVal + relative amplitude for the intersecting proteins
+
+for (i in 1:nrow(common_list)) {
+  common_list$WT_pVal[i] <- WT_data[which(WT_data$Uniprot_ID %in% common_list$common_uniprot[i]), 4]
+  common_list$CKO_pVal[i] <- CKO_data[which(CKO_data$Uniprot_ID %in% common_list$common_uniprot[i]), 4]
+  common_list$WT_RA[i] <- WT_data[which(WT_data$Uniprot_ID %in% common_list$common_uniprot[i]), 5]
+  common_list$CKO_RA[i] <- CKO_data[which(CKO_data$Uniprot_ID %in% common_list$common_uniprot[i]), 5]
+  common_list$WT_phase[i] <- WT_data[which(WT_data$Uniprot_ID %in% common_list$common_uniprot[i]), 6]
+  common_list$CKO_phase[i] <- CKO_data[which(CKO_data$Uniprot_ID %in% common_list$common_uniprot[i]), 6]
+}
+
+colnames(common_list) <- c("Uniprot ID", "Protein name", "Gene name", "WT pVal", "CKO pVal", "WT Relative Amplitude", "CKO Relative Amplitude", "WT phase", "CKO phase")
+
+# Remove repeated entry
+common_list <- head(common_list, -1)
+
+# Enable export to csv
+common_list <- apply(common_list, 2, as.character)
+
+write.csv(common_list, "Common_proteins_list.csv", row.names = F)
+```
+
+
+```{r}
+# Look at proteins only rhythmic in CKO or only in WT
+
+CKO_only <- setdiff(CKO_data$Uniprot_ID, WT_data$Uniprot_ID)
+CKO_only_rhythms <- CKO_data[which(CKO_data$Uniprot_ID %in% CKO_only),]
+
+WT_only <- setdiff(WT_data$Uniprot_ID, CKO_data$Uniprot_ID)
+WT_only_rhythms <- WT_data[which(WT_data$Uniprot_ID %in% WT_only),]
+
+write.csv(CKO_only_rhythms, "Rhythmic_in_CKO_only.csv", row.names = FALSE)
+write.csv(WT_only_rhythms, "Rhythmic_in_WT_only.csv", row.names = FALSE)
+
+```
+
+```{r}
+#Draw Venn diagram
+
+overlap <- calculate.overlap(x = list("WT" = WT_data$Uniprot_ID, "CKO" = CKO_data$Uniprot_ID)) #calculate overlap to pass into venn diagram function
+
+venn.plot <- draw.pairwise.venn(length(overlap$a1), 
+                                length(overlap$a2), 
+                                length(overlap$a3), 
+                                euler.d = TRUE, 
+                                scaled = TRUE,
+                                rotation.degree = 180,
+                                fill = c("blue", "red"), 
+                                alpha = c(0.4, 0.4),
+                                lty = c(0,0), 
+                                cex = 2,
+                                cat.cex = 2.5, 
+                                cat.dist = c(0.001, 0.01),
+                                cat.prompts = TRUE
+                                )
+
+pdf("Venn_diagram.pdf", width = 5, height = 5)
+
+grid.draw(venn.plot)
+
+dev.off()
+
+```
+
+```{r}
+# Define the background proteome - i.e. all unique proteins even if only present in one genotype
+
+WT_total <- read.csv("WT_RAIN_results.csv", stringsAsFactors = F)
+CKO_total <- read.csv("CKO_RAIN_results.csv", stringsAsFactors = F)
+
+background_genes <- unique(c(WT_total$Gene_names, CKO_total$Gene_names))
+background_uniprot <- unique(c(WT_total$Uniprot_ID, CKO_total$Uniprot_ID))
+
+write.csv(background_genes, "Background_genes.csv", row.names = F)
+write.csv(background_uniprot, "Background_uniprot.csv", row.names = F)
+```
+

@@ -1,0 +1,245 @@
+---
+title: "Estimating relative amplitude"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Combined analysis Notebook 3 - DESCRIPTION
+#
+# Here we estimate relative amplitude for each protein.
+# Relative amplitude = range / mean abundance,
+# To calculate range, we use a 24-hour moving average method to detrend data before subtracting max - min.
+# This allows the elimination of >24h trends (e.g. if everything is decreasing over several days)
+#
+# A relative amplitude threshold is used in proteomics analysis to define biological significance
+# This threshold is chosen in this study to be 10%
+#
+# In this noteboook we also include code to make density plots to compare the abundance between rhythmic vs non-rhythmic proteins.
+# This is done separately for each genotype, and the boot-strapped KS test is used to compare distributions.
+# Probability density is more useful than normal histograme because it allows us to compare distributions between groups of very different sizes.
+#
+# INPUTS = normalised data for significantly rhythmic proteins output by RAIN (.csv)
+# OUTPUTS = detrended data, lists of proteins with relative amplitudes and baselines (mean abundance) calculated (.csv), probability density plots and cumulative distribution functions comparing rhythmic vs non-rhythmic protein abundance (.pdf)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("Matching")) {
+  install.packages("Matching", dependencies = TRUE)
+  library(Matching)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data files
+WT_data <- read.csv("WT_proteome_all_significant_RAIN.csv")
+WT_data_start <- WT_data[,-1:-7]
+WT_data_start <- t(WT_data_start)
+colnames(WT_data_start) <- WT_data$Uniprot_ID
+
+
+CKO_data <- read.csv("CKO_proteome_all_significant_RAIN.csv")
+CKO_data_start <- CKO_data[,-1:-7]
+CKO_data_start <- t(CKO_data_start)
+colnames(CKO_data_start) <- CKO_data$Uniprot_ID
+
+```
+
+```{r}
+#Detrend the data using a 24h moving average
+#Set up useful parameters for detrending
+
+period = 24     #set period length to detrend
+n_samples = ncol(WT_data_start)   #total number of samples
+
+time <- seq(24,93,3)   #list of time-points
+row_days = round(period/(time[2] - time [1]))    #number of rows that correspond to 24 hours (or 1 period length)
+
+WT_detrended_data <- matrix(nrow=length(WT_data_start[,1]) - (row_days), ncol=ncol(WT_data_start))  #initialise a new matrix for the detrended data, excluding the first and last 12 hours (i.e. half of period)
+colnames(WT_detrended_data) <- colnames(WT_data_start)     #set up the column names
+
+#Fill up the matrix with the detrended data
+for (i in 1:n_samples){
+  for (j in 1:length(WT_detrended_data[,1])){
+   WT_detrended_data[j,i] = WT_data_start[row_days/2+j,i] - mean(WT_data_start[j:(j + row_days),i])
+  }
+}
+
+#Export the detrended data as a .csv file
+write.csv(WT_detrended_data, file = "WT_Detrended_data.csv", row.names = F)
+
+
+# SAME FOR CKO
+period = 24     #set period length to detrend
+n_samples = ncol(CKO_data_start)   #total number of samples
+time <- seq(24,93,3)   #list of time-points
+row_days = round(period/(time[2] - time [1]))    #number of rows that correspond to 24 hours (or 1 period length)
+
+CKO_detrended_data <- matrix(nrow=length(CKO_data_start[,1]) - (row_days), ncol=ncol(CKO_data_start))  #initialise a new matrix for the detrended data, excluding the first and last 12 hours (i.e. half of period)
+colnames(CKO_detrended_data) <- colnames(CKO_data_start)     #set up the column names
+
+#Fill up the matrix with the detrended data
+for (i in 1:n_samples){
+  for (j in 1:length(CKO_detrended_data[,1])){
+   CKO_detrended_data[j,i] = CKO_data_start[row_days/2+j,i] - mean(CKO_data_start[j:(j + row_days),i])
+  }
+}
+
+#Export the detrended data as a .csv file
+write.csv(CKO_detrended_data, file = "CKO_Detrended_data.csv", row.names = F)
+```
+
+```{r}
+#Calculate relative amplitude
+
+#Calculate Means of each column
+WT_Baselines <- as_tibble(colMeans(WT_data_start))
+WT_Baselines <- rename(WT_Baselines, Means = value)
+
+#Calculate peak-trough amplitude from detrended data
+
+WT_Amplitudes <- as_tibble(apply(WT_detrended_data, 2, function(df) {max(df)-min(df)}))
+
+WT_Relative_amplitudes <- as_tibble(WT_Amplitudes/WT_Baselines)
+WT_Relative_amplitudes <- rename(WT_Relative_amplitudes, WT_Relative_amplitudes = value)
+
+
+
+#Calculate Means of each column
+CKO_Baselines <- as_tibble(colMeans(CKO_data_start))
+CKO_Baselines <- rename(CKO_Baselines, Means = value)
+
+#Calculate peak-trough amplitude from detrended data
+
+CKO_Amplitudes <- as_tibble(apply(CKO_detrended_data, 2, function(df) {max(df)-min(df)}))
+
+CKO_Relative_amplitudes <- as_tibble(CKO_Amplitudes/CKO_Baselines)
+CKO_Relative_amplitudes <- rename(CKO_Relative_amplitudes, CKO_Relative_amplitudes = value)
+```
+
+```{r}
+#Export a file with only those with relative amplitude ≥0.1
+
+WT_total_data <- cbind(WT_data[1:4], WT_Relative_amplitudes, WT_data[5:ncol(WT_data)])
+
+WT_big_hits <- WT_total_data[WT_total_data$WT_Relative_amplitudes >= 0.1,]
+
+write.csv(WT_total_data, "WT_all_hits.csv", row.names = F)
+write.csv(WT_big_hits, "WT_big_hits.csv", row.names = F)
+
+
+
+CKO_total_data <- cbind(CKO_data[1:4], CKO_Relative_amplitudes, CKO_data[5:ncol(CKO_data)])
+
+CKO_big_hits <- CKO_total_data[CKO_total_data$CKO_Relative_amplitudes >= 0.1,]
+write.csv(CKO_total_data, "CKO_all_hits.csv", row.names = F)
+write.csv(CKO_big_hits, "CKO_big_hits.csv", row.names = F)
+```
+
+
+```{r}
+# Export files with baselines
+
+WT_export <- cbind(WT_data[1:4], WT_Relative_amplitudes, WT_Baselines, WT_data[5:ncol(WT_data)])
+CKO_export <- cbind(CKO_data[1:4], CKO_Relative_amplitudes, CKO_Baselines, CKO_data[5:ncol(WT_data)])
+
+write.csv(WT_export, "WT_RA_B.csv", row.names = F)
+write.csv(CKO_export, "CKO_RA_B.csv", row.names = F)
+
+```
+
+```{r}
+#read the RAIN files from INDEPENDENT analysis
+WT_all <- read.csv("WT_RAIN_results.csv", stringsAsFactors = F)
+CKO_all <- read.csv("CKO_RAIN_results.csv", stringsAsFactors = F)
+
+#calculate baseline (=average abundance in all timepoints) - be careful which columns contain teh actual timepoint data
+WT_all$Baseline <- rowMeans(WT_all[,8:31])
+CKO_all$Baseline <- rowMeans(CKO_all[,8:31])
+
+#create rhythmic & nonrhythmic subsets
+WT_rhy <- subset(WT_all, pVal<0.05)
+CKO_rhy <- subset(CKO_all, pVal<0.05)
+WT_nonrhy <- subset(WT_all, pVal>0.05)
+CKO_nonrhy <- subset(CKO_all, pVal>0.05)
+```
+
+```{r}
+# Density plots
+
+#create function for plotting and testing distributions
+
+#set colours
+colours <- c("WT Rhythmic" = "orange", "WT Not Rhythmic" = "navy", "CKO Rhythmic" = "red", "CKO Not Rhythmic" = "dark green", "WT Random"="orange", "CKO Random"="red", "WT Background" = "navy", "CKO Background" = "dark green")
+
+#function
+probability_plots <- function(x1, x2, n1, n2, xn) {
+  tt <- t.test(log10(x1), log10(x2), paired = F)
+  
+  pd <- ggplot() + 
+    geom_density(aes(x = log10(x1), fill = n1),
+                color = "black", alpha = 0.5) +
+    geom_density(aes(x = log10(x2), fill = n2),
+               color = "black", alpha = 0.5) +
+    scale_fill_manual(name = "", values = colours) +
+    xlim(3, 8) +
+    ylim(0, 0.7) +
+    labs(x =xn, subtitle = paste("t-test p-val: ", format(round(tt$p.value,4))), y = "Probability density") +
+    theme(panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_line(colour = "black"),
+          axis.line = element_line(colour = "black"),
+          axis.text=element_text(colour="black"),
+          legend.background = element_blank(),
+          legend.key = element_blank()
+          )
+  
+  st <- ks.boot(x1, x2, nboots=1000)
+  
+  cp <- ggplot() +
+    geom_step(aes(x=log10(x1), colour = n1), stat="ecdf") + 
+    geom_step(aes(x=log10(x2), colour = n2), stat="ecdf") + 
+    scale_color_manual(name = "", values = colours) +
+    labs(subtitle = paste("KS test p-val: ", format(round(st$ks.boot.pvalue,4))), y="Cumulative probability", x=xn) +
+    theme(panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_line(colour = "black"),
+          axis.line = element_line(colour = "black"),
+          axis.text=element_text(colour="black"),
+          legend.background = element_blank(),
+          legend.key = element_blank()
+          )
+  
+grid.arrange(pd, cp, nrow=2)
+} 
+
+WT_rvbg <- probability_plots(WT_rhy$Baseline, WT_nonrhy$Baseline, "WT Rhythmic", "WT Not Rhythmic", "Log10(Abundance)") 
+CKO_rvbg <- probability_plots(CKO_rhy$Baseline, CKO_nonrhy$Baseline, "CKO Rhythmic", "CKO Not Rhythmic", "Log10(Abundance)")
+
+p <- grid.arrange(WT_rvbg, CKO_rvbg, nrow=1)
+
+ggsave(plot=p, "WT and CKO rhy vs nonrhy abundance.pdf", width=8, height = 5)
+
+```

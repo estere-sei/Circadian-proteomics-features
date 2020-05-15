@@ -1,0 +1,106 @@
+---
+title: "Comparing average expression levels"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Combined analysis Notebook 4 - DESCRIPTION
+#
+# Here we carry out analyses to compare average expression level for each protein, between genotypes.
+# This is using data split into WT/CKO AFTER normalisation, so batch correction has occurred already.
+# Volcano plots visualise the data - this is done in the next notebook.
+#
+# INPUTS = all normalised data (.csv)
+# OUTPUTS = results of mutliple t tests with BH correction (.csv)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+if (!require("BiocManager")) {
+  install.packages("BiocManager", dependencies = TRUE)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+```
+
+```{r}
+#make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data files
+
+master_list <- read.csv("All_normalised_data.csv", stringsAsFactors=FALSE)
+```
+
+
+```{r}
+# Selecting the main gene name from each line
+main_gene <- vector("list", length(master_list$gene_names)) # Create empty vector
+
+# For loop to either print the name or separate them if there are several in one line
+for (i in 1:length(master_list$gene_names)) {
+  main_gene[i] <- strsplit(master_list$gene_names[i], ";")
+}
+
+# Select only the first element on each line --> this is the main protein for each line
+
+main_gene <- unlist(lapply(main_gene, '[', 1))
+
+```
+
+```{r}
+# Make WT + CKO data frames
+
+WT_data <- cbind(master_list$uniprot, master_list$protein_names, master_list$gene_names, main_gene, master_list[,4:27])
+
+CKO_data <- cbind(master_list$uniprot, master_list$protein_names, master_list$gene_names, main_gene, master_list[,28:51])
+
+```
+
+```{r}
+# Calculate fold-changes in mean values
+
+WT_averages <- apply(WT_data[,5:ncol(WT_data)], 1, mean)
+CKO_averages <- apply(CKO_data[,5:ncol(CKO_data)], 1, mean)
+
+fold_changes <- CKO_averages / WT_averages
+
+log_fold_changes <- log2(fold_changes)
+
+```
+
+```{r}
+# Carry out Student's t-tests on each protein and output the p value, then correct multiple testing using the Benjamini–Hochberg method
+test_input <- log10(master_list[,4:ncol(master_list)])
+
+t_test_output <- apply(test_input, 1, function(x) t.test(x[1:24], x[25:48])$p.value)
+
+BH_adjusted_p <- p.adjust(t_test_output, "BH")
+
+results <- cbind(master_list[,1:3], main_gene, t_test_output, BH_adjusted_p, fold_changes, log_fold_changes)
+colnames(results) <- c("Uniprot_ID","protein_names", "gene_names", "main_gene", "pVal", "BH_pVal", "fold_change", "log_fold_change")
+
+```
+
+```{r}
+# Export the results of the data analysis, ordered by corrected p value
+ordered_results <- results %>% arrange(BH_pVal)
+
+write.csv(ordered_results, "CKOvsWT_results.csv", row.names = F)
+
+```

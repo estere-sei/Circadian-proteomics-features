@@ -1,0 +1,174 @@
+---
+title: "Half-life vs rhythmicity"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 9 - DESCRIPTION
+#
+# This notebook is a fork from the analysis performed by Estere Seinkmane.
+# ES extracted the half-life information from the dataset by McShane et al. 2016, Cell. https://www.cell.com/cell/fulltext/S0092-8674(16)31248-X
+#
+# ES then corrected our Uniprot IDs to ones that are well annotated on Uniprot (thus losing a few but not many).
+# Thus it was possible to match the dataset with McShane et al, and get half-life information for further analysis and graphical representation, which is shown in this notebook.
+#
+# INPUTS = lists of rhythmic proteins and RAIN results from the independent RAIN analysis, with corrected Uniprot IDs, as well as protein stability from McShane et al. (.csv)
+# OUTPUTS = probability density plots comparing half-life between rhythmic vs non-rhythmic proteins for each genotype (.pdf).
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+if (!require("Matching")) {
+  install.packages("Matching", dependencies = TRUE)
+  library(Matching)
+} # This is for ks.boot
+
+#read the RAIN files from independent analysis, with correct primary IDs
+WT_data <- read.csv("WT RAIN corrected ID.csv", stringsAsFactors = F)
+CKO_data <- read.csv("CKO RAIN corrected ID.csv", stringsAsFactors = F)
+
+#rhythmic lists with relative amplitude from independent analysis 
+WT_rhy <- read.csv("rhythmic WT corrected ID.csv", stringsAsFactors = F)
+CKO_rhy <- read.csv("rhythmic CKO corrected ID.csv", stringsAsFactors = F)
+
+```
+
+
+
+```{r}
+#read in the half-life data - in this case from McShane et al Cell 2016, done in NIH 3T3 with AHA
+prot_stab <- read.csv("McShane et al prot stability 3t3.csv", stringsAsFactors = F)
+
+#they have 2 degradation profiles (exponential and non-exponential), so separate based on that and select half life
+prot_ned <- subset(prot_stab, prot_stab$Degradation.profile == "NED")
+prot_ed <- subset(prot_stab, !(prot_stab$Degradation.profile == "NED"))
+
+cn <- c("Uniprot_ID", "Half_life", "Deg profile")
+
+#pick the one-phase decay half-life value for ED proteins, and 2-phase for NED - how they describe in the paper
+prot_ned_s <- prot_ned[,c(1,39,41)]
+prot_ed_s <- prot_ed[,c(1,38,41)]
+colnames(prot_ned_s) <- cn
+colnames(prot_ed_s) <- cn
+
+prot_hl <- rbind(prot_ned_s, prot_ed_s)
+
+#make numeric; have >300h half-life for some proteins that because of > gets converted to NAs - will be just excluded from correlations, fine for now
+prot_hl$Half_life <- as.numeric(prot_hl$Half_life)
+
+#merge rhythmicity and half-life data
+WT_rhy_hl <- merge(WT_rhy, prot_hl, by="Uniprot_ID")
+
+CKO_rhy_hl <- merge(CKO_rhy, prot_hl, by="Uniprot_ID")
+#although CKO for sure have proteostasis defects, so half-lives would be altered -> probably even less valid to use this dataset
+
+WT_all_hl <- merge(WT_data, prot_hl, by="Uniprot_ID")
+CKO_all_hl <- merge(CKO_data, prot_hl, by="Uniprot_ID")
+
+#also calculate again baseline (=average abundance across timepoints)
+WT_rhy_hl$Baseline <- rowMeans(WT_rhy_hl[,9:32])
+CKO_rhy_hl$Baseline <- rowMeans(CKO_rhy_hl[,9:32])
+WT_all_hl$Baseline <- rowMeans(WT_all_hl[,8:31])
+CKO_all_hl$Baseline <- rowMeans(CKO_all_hl[,8:31])
+
+                  
+```
+
+```{r}
+##########################
+
+# Adding in some spice to the theme to adjust the background and axis text appearance only!
+
+##########################
+
+#create function for plotting and testing distributions (taken from abundance and rhythmicity script)
+
+#set colours
+colours <- c("WT Rhythmic" = "orange", "WT Background" = "navy", "CKO Rhythmic" = "red", "CKO Background" = "dark green", "WT Random"="orange", "CKO Random"="red", "WT Not Rhythmic" = "navy", "CKO Not Rhythmic" = "dark green")
+
+#function
+probability_plots <- function(x1, x2, n1, n2, xn) {
+  pd <- ggplot() + 
+    geom_density(aes(x = log10(x1), fill = n1),
+                color = "black", alpha = 0.5) +
+    geom_density(aes(x = log10(x2), fill = n2),
+               color = "black", alpha = 0.5) +
+  scale_fill_manual(name = "", values = colours) +
+  labs(x =xn, y = "Probability density") +
+    theme(panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_line(colour = "black"),
+          axis.line = element_line(colour = "black"),
+          axis.text=element_text(colour="black"),
+          legend.background = element_blank(),
+          legend.key = element_blank()
+          )
+  
+  st <- ks.boot(x1, x2, nboots=1000)
+  
+  cp <- ggplot() +
+    geom_step(aes(x=log10(x1), colour = n1), stat="ecdf") + 
+    geom_step(aes(x=log10(x2), colour = n2), stat="ecdf") + 
+    scale_color_manual(name = "", values = colours) +
+    labs(subtitle = paste("KS test p-val: ", format(round(st$ks.boot.pvalue,4))), y="Cumulative probability", x=xn) +
+    theme(panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_line(colour = "black"),
+          axis.line = element_line(colour = "black"),
+          axis.text=element_text(colour="black"),
+          legend.background = element_blank(),
+          legend.key = element_blank()
+          )
+  
+grid.arrange(pd, cp, nrow=2)
+
+} 
+
+```
+
+```{r}
+#plotting against not rhythmic
+
+WT_nonrhy_hl <- subset(WT_all_hl, pVal > 0.05)
+CKO_nonrhy_hl <- subset(CKO_all_hl, pVal > 0.05)
+
+WT_rvnr <- probability_plots(WT_rhy_hl$Half_life, WT_nonrhy_hl$Half_life, "WT Rhythmic", "WT Not Rhythmic", "Log10(Half-life)") 
+
+CKO_rvnr <- probability_plots(CKO_rhy_hl$Half_life, CKO_nonrhy_hl$Half_life, "CKO Rhythmic", "CKO Not Rhythmic", "Log10(Half-life)") 
+
+p <- grid.arrange(WT_rvnr, CKO_rvnr, nrow=1)
+ggsave(plot=p, "WT and CKO rhythmic vs not rhythmic half-life DAVID.pdf", width=8, height = 5)
+
+median(na.omit(WT_rhy_hl$Half_life)) #32.4h
+median(na.omit(WT_nonrhy_hl$Half_life)) #27.3h
+
+median(na.omit(CKO_rhy_hl$Half_life)) #31.4h
+median(na.omit(CKO_nonrhy_hl$Half_life)) #26.6h
+
+boxplot((na.omit(WT_rhy_hl$Half_life)), na.omit(WT_nonrhy_hl$Half_life))
+
+
+```
+
+

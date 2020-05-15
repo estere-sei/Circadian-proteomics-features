@@ -1,0 +1,90 @@
+---
+title: "Steady-state phosphorylation levels"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Combined analysis Notebook 4 - DESCRIPTION
+#
+# Here we carry out analyses to compare average phosphorylation level for each phosphopeptide, between genotypes.
+# This is using data split into WT/CKO AFTER normalisation, so batch correction has occurred already.
+#
+# INPUTS = all normalised data (.csv)
+# OUTPUTS = results of mutliple t tests with BH correction (.csv)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+```
+
+```{r}
+#make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data files
+
+master_list <- read.csv("All_phospho_normalised_data.csv" )
+
+```
+
+```{r}
+# Make WT + CKO data frames
+
+WT_data <- cbind(Phosphosite = master_list$Phosphosite, 
+                 Protein_names = master_list$Protein.names, 
+                 Gene_names = master_list$Gene.names, 
+                 master_list[,25:48])
+
+CKO_data <- cbind(Phosphosite = master_list$Phosphosite, 
+                 Protein_names = master_list$Protein.names, 
+                 Gene_names = master_list$Gene.names, 
+                 master_list[,49:72])
+
+```
+
+```{r}
+# Calculate fold-changes in mean values
+
+WT_averages <- apply(WT_data[,4:ncol(WT_data)], 1, mean)
+CKO_averages <- apply(CKO_data[,4:ncol(CKO_data)], 1, mean)
+
+fold_changes <- CKO_averages / WT_averages
+
+log_fold_changes <- log2(fold_changes)
+
+```
+
+```{r}
+# Carry out Student's t-tests on each protein and output the p value, then correct using the Benjamini–Hochberg method
+test_input <- cbind(master_list[,25:ncol(master_list)])
+t_test_output <- apply(test_input, 1, function(x) t.test(x[1:24], x[25:48])$p.value)
+
+BH_adjusted_p <- p.adjust(t_test_output, "BH")
+
+# Bonf_adjusted_p <- p.adjust(t_test_output, "bonferroni")
+
+results <- cbind(WT_data[,1:3], t_test_output, BH_adjusted_p, fold_changes, log_fold_changes)
+colnames(results) <- c("Phosphosite","protein_names", "gene_names", "pVal", "BH_pVal", "fold_change", "log_fold_change")
+
+```
+
+```{r}
+# Export the results ordered by significance
+
+ordered_results <- results %>% arrange(BH_pVal)
+
+write.csv(ordered_results, "CKOvsWT_results_phospho.csv", row.names = F)
+
+```

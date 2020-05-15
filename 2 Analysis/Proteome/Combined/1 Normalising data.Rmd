@@ -1,0 +1,221 @@
+---
+title: "Sample loading normalisation + IRS"
+output:
+---
+
+```{r}
+#######################################################################################################################################
+# Combined analysis Notebook 1 - DESCRIPTION
+#
+# Here we take the raw data (output of Perseus without NA-filtering).
+# First, we infer data for the missing sample - fortunately this was one of the middle samples, so data is inferred by taking the 
+# mean of the adjacent time points.
+# We then apply sample loading normalisation to correct for small errors in pipetting - this assumes equal protein was used for
+# all samples submitted for TMT labelling.
+# We then apply Internal Reference Scaling as described by Phil Wilmarth - https://github.com/pwilmart/IRS_normalization
+# This corrects for batch effects.
+# Along the way we plot the data to make sure that we can spot obvious mistakes.
+# Finally, we export the data because this is handy for plotting proteins of interest in other software!
+#
+# INPUTS = raw data from Perseus (.txt)
+# OUTPUTS = normalised data for furtheer analysis (.csv)
+#
+#######################################################################################################################################
+```
+
+```{r}
+#setup
+
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+if (!require("BiocManager")) {
+  install.packages("BiocManager", dependencies = TRUE)
+}
+
+if (!require("edgeR")) {
+  BiocManager::install("edgeR")
+  library(edgeR)
+}
+
+if (!require("psych")) {
+  install.packages("psych", dependencies = TRUE)
+  library(psych)
+} 
+
+# read the raw data file, and ensure "NaN" is interpreted as NA
+data_start <- read.delim("CRM3962_6set_MQ1633C_prot_noFil_m8.txt", na = c("NaN"), stringsAsFactors = F)
+data_start <- data_start[-1,] # Remove the first row which is just junk
+data_start[, 1:60] <- sapply(data_start[,1:60], as.numeric) # Make the data numeric - in our case the file is organised like this
+missing_data <- apply(cbind(data_start[,13], data_start[,15]), 1, mean) # Infer values for CKO sample 12 which was missing
+data_start <- cbind(data_start[1:13], missing_data, data_start[15:ncol(data_start)])
+
+# Remove rows which contain NaN within the data columns
+data_start <- data_start[rowSums(is.na(data_start[, 1:60])) == 0,]
+
+```
+
+```{r}
+# Clean up majority protein IDs
+# First, extract the important column
+proteins <- as.vector(data_start$Majority.protein.IDs)
+
+# Create empty vector
+protein_id <- vector("list", length(proteins))
+
+# For loop to either print the name or separate them if there are several in one line
+for (i in 1:length(proteins)) {
+  protein_id[i] <- strsplit(proteins[i], ";")
+}
+
+# Select only the first element on each line --> this is the main protein for each line then attach it to the first column of the total proteome dataframe
+
+protein_ids <- unlist(lapply(protein_id, '[[', 1))
+data_start$uniprot <- protein_ids
+
+```
+
+```{r}
+#Create name lists
+uniprot = as.list(data_start$uniprot)
+uniprot <- unlist(uniprot)
+protein_names = as.list(data_start[,79])
+protein_names <- unlist(protein_names)
+gene_names = as.list(data_start[,80])
+gene_names <- unlist(gene_names)
+
+# Extract data only - in our case this is how the data was organised in the txt file
+WT_data_raw <- as.data.frame(data_start[31:60])
+CKO_data_raw <- as.data.frame(data_start[1:30])
+```
+
+```{r}
+#See what raw data looks like 
+
+boxplot(log2(WT_data_raw), col = rep(c("red", "green", "blue"), each = 10), 
+        main = "WT Raw data: \nExp1 (red), Exp2 (green), Exp3 (blue)",
+        xlab = 'TMT Sample', ylab = 'log2 of Intensity', notch = TRUE)
+
+boxplot(log2(CKO_data_raw), col = rep(c("red", "green", "blue"), each = 10), 
+        main = "CKO Raw data: \nExp1 (red), Exp2 (green), Exp3 (blue)",
+        xlab = 'TMT Sample', ylab = 'log2 of Intensity', notch = TRUE)
+
+# can also look at density plots (like a distribution histogram)
+plotDensities(log2(WT_data_raw), col = rep(c('red', 'green', 'blue'), 6), 
+              main = 'WT Raw data')
+
+plotDensities(log2(CKO_data_raw), col = rep(c('red', 'green', 'blue'), 6), 
+              main = 'CKO Raw data')
+
+# check the column totals (per channel sums)
+format(round(colSums(WT_data_raw), digits = 0), big.mark = ",")
+format(round(colSums(CKO_data_raw), digits = 0), big.mark = ",")
+```
+
+```{r}
+#Sample loading normalisation + IRS Normalisation (adapted from: Phil Wilmarth, OHSU PSR Core, January 2018)
+
+# separate the TMT data by experiment
+exp1_raw <- WT_data_raw[c(1:10)]
+exp2_raw <- WT_data_raw[c(11:20)]
+exp3_raw <- WT_data_raw[c(21:30)]
+exp4_raw <- CKO_data_raw[c(1:10)]
+exp5_raw <- CKO_data_raw[c(11:20)]
+exp6_raw <- CKO_data_raw[c(21:30)]
+
+# figure out the global scaling value
+target <- mean(c(colSums(exp1_raw), colSums(exp2_raw), colSums(exp3_raw), colSums(exp4_raw), colSums(exp5_raw), colSums(exp6_raw)))
+
+# do the sample loading normalization before the IRS normalization
+# there is a different correction factor for each column
+norm_facs <- target / colSums(exp1_raw)
+exp1_sl <- sweep(exp1_raw, 2, norm_facs, FUN = "*")
+norm_facs <- target / colSums(exp2_raw)
+exp2_sl <- sweep(exp2_raw, 2, norm_facs, FUN = "*")
+norm_facs <- target / colSums(exp3_raw)
+exp3_sl <- sweep(exp3_raw, 2, norm_facs, FUN = "*")
+norm_facs <- target / colSums(exp4_raw)
+exp4_sl <- sweep(exp4_raw, 2, norm_facs, FUN = "*")
+norm_facs <- target / colSums(exp5_raw)
+exp5_sl <- sweep(exp5_raw, 2, norm_facs, FUN = "*")
+norm_facs <- target / colSums(exp6_raw)
+exp6_sl <- sweep(exp6_raw, 2, norm_facs, FUN = "*")
+
+# make a pre-IRS data frame after sample loading norms
+data_sl <- cbind(exp1_sl, exp2_sl, exp3_sl, exp4_sl, exp5_sl, exp6_sl)
+
+# see what the SL normalised data look like
+boxplot(log2(data_sl), col = rep(c("red", "green", "blue"), each = 10), 
+        main = "Sample loading (SL) normalized data: \nExp1 (red), Exp2 (green), Exp3 (blue)",
+        xlab = 'TMT Sample', ylab = 'log2 of Intensity', notch = TRUE)
+
+# can also look at density plots (like a distribution histogram)    
+plotDensities(log2(data_sl), col = rep(c("red", "green", "blue"), 10), main = "SL data")
+
+# check the columnn totals
+format(round(colSums(data_sl), digits = 0), big.mark = ",")
+```
+
+```{r}
+# make working frame with row sums from each frame
+irs <- tibble(apply(exp1_sl[,9:10], 1, mean), apply(exp2_sl[,9:10], 1, mean), apply(exp3_sl[,9:10], 1, mean), apply(exp4_sl[,9:10], 1, mean), apply(exp5_sl[,9:10], 1, mean), apply(exp6_sl[,9:10], 1, mean))
+
+colnames(irs) <- c("mean1", "mean2", "mean3", "mean4", "mean5", "mean6")
+
+# get the average intensity for each protein
+irs$average <- apply(irs, 1, mean)
+
+# compute the scaling factor vectors
+irs$fac1 <- irs$average / irs$mean1
+irs$fac2 <- irs$average / irs$mean2
+irs$fac3 <- irs$average / irs$mean3
+irs$fac4 <- irs$average / irs$mean4
+irs$fac5 <- irs$average / irs$mean5
+irs$fac6 <- irs$average / irs$mean6
+
+# make new data frame with normalized data
+data_irs <- exp1_sl * irs$fac1
+data_irs <- cbind(data_irs, exp2_sl * irs$fac2)
+data_irs <- cbind(data_irs, exp3_sl * irs$fac3)
+data_irs <- cbind(data_irs, exp4_sl * irs$fac4)
+data_irs <- cbind(data_irs, exp5_sl * irs$fac5)
+data_irs <- cbind(data_irs, exp6_sl * irs$fac6)
+
+# see what the IRS data look like
+boxplot(log2(data_irs), col = rep(c("red", "green", "blue"), each = 10), 
+        main = "Internal Reference Scaling (IRS) normalized data: \nExp1 (red), Exp2 (green), Exp3 (blue)",
+        xlab = 'TMT Sample', ylab = 'log2 of Intensity', notch = TRUE)
+
+# can also look at density plots (like a distribution histogram)    
+plotDensities(log2(data_irs), col = rep(c("red", "green", "blue"), 10), main = "IRS data")
+
+# check column totals
+format(round(colSums(data_irs), digits = 0), big.mark = ",")
+
+```
+
+
+```{r}
+# see how things cluster now that we have nice boxplots and density plots
+plotMDS(log2(data_irs), col = rep(c("red", "green", "blue"), each = 10), 
+        main = "SL/TMM clusters group by TMT experiment")
+```
+
+```{r}
+#Export normalised data of both genotypes
+
+# Remove pools from the dataframe so you can use the file for plotting elsewhere
+irs <- data_irs %>% dplyr::select(-contains("P"))
+
+# Combine uniprot ID, protein names, gene names, normalised data without pools
+master_list <- cbind(uniprot, protein_names, gene_names, irs)
+
+write.csv(master_list, "All_normalised_data.csv", row.names = F)
+
+```

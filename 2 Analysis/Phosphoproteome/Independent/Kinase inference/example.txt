@@ -1,0 +1,6 @@
+In your terminal, cd to this directory, and then run the Python code.
+Here is an example of what I did, in this case to compare WT with background.
+
+python extract_kinase_motifs.py Background.fasta WT.fasta -o WT.pdf
+
+The code was written by Dr Tim Stevens. For details please see extract_kinase_motifs.py 

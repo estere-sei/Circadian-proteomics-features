@@ -1,0 +1,98 @@
+---
+title: "Comparing relative amplitudes"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 7 - DESCRIPTION
+#
+# Here, we extract and export phosphopeptides that are rhythmic in both genotypes.
+# For these, we also calculate the fold-change in relative amplitudes and export this information for plotting elsewhere. 
+#
+# INPUTS = all phosphopeptides detected as rhythmic by RAIN (.csv)
+# OUTPUTS = histograms and density plots comparing relative amplitudes (.pdf), list of fold-changes in relative amplitudes between genotypes (.csv).
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+if (!require("Matching")) {
+  install.packages("Matching", dependencies = TRUE)
+  library(Matching)
+}
+
+library(reshape2)
+
+#make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data files
+
+WT_hits <- read.csv("WT.p_all_hits.csv", stringsAsFactors = FALSE)
+WT_hits <- WT_hits[, 1:10]
+
+CKO_hits <- read.csv("CKO.p_all_hits.csv", stringsAsFactors = FALSE)
+CKO_hits <- CKO_hits[, 1:10]
+
+```
+
+
+```{r}
+# Log10 transform of relative amplitudes
+
+WT_hits$Log10RA <- log10(WT_hits$WT_Relative_amplitudes)
+CKO_hits$Log10RA <- log10(CKO_hits$CKO_Relative_amplitudes)
+
+t.test(WT_hits$Log10RA, CKO_hits$Log10RA) # t test with Welch correction
+
+```
+
+```{r}
+# How many CKO rhythmic proteins are rhythmic in WT but below the 10% RA threshold?
+
+common_site <- intersect(CKO_hits$Phosphosite, WT_hits$Phosphosite)
+
+common_list <- cbind(common_site)
+common_list <- as.data.frame(common_list)
+
+common_list <- as.data.frame(common_list[!is.na(common_list)])
+colnames(common_list) <- c("common_site")
+
+# Select pVal + relative amplitude for the intersecting proteins
+
+for (i in 1:nrow(common_list)) {
+  common_list$main_gene[i] <- WT_hits[which(WT_hits$Phosphosite %in% common_list$common_site[i]), 4]
+  common_list$Protein_names[i] <- WT_hits[which(WT_hits$Phosphosite %in% common_list$common_site[i]), 3]
+  common_list$WT_pVal[i] <- WT_hits[which(WT_hits$Phosphosite %in% common_list$common_site[i]), 6]
+  common_list$CKO_pVal[i] <- CKO_hits[which(CKO_hits$Phosphosite %in% common_list$common_site[i]), 6]
+  common_list$WT_RA[i] <- WT_hits[which(WT_hits$Phosphosite %in% common_list$common_site[i]), 10]
+  common_list$CKO_RA[i] <- CKO_hits[which(CKO_hits$Phosphosite %in% common_list$common_site[i]), 10]
+}
+
+colnames(common_list) <- c("Phosphosite", "main_gene", "Protein_names", "WT pVal", "CKO pVal", "WT Relative Amplitude", "CKO Relative Amplitude")
+
+
+
+a <- common_list
+a$amplification <- a$`CKO Relative Amplitude` / a$`WT Relative Amplitude`
+a$logamp <- log10(a$amplification)
+write.csv(a, "CKO.p_all_amplified_proteins.csv", row.names = F)
+```
+

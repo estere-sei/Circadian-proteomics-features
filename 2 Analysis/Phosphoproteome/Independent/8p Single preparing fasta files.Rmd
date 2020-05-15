@@ -1,0 +1,71 @@
+---
+title: "Preparing fasta files"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 8 - DESCRIPTION
+#
+# This notebook functions to create input files for the script written by Dr Tim Stevens, which uses the PHOSIDA database to infer kinase activity from our phosphopeptide sequences.
+# Hence we need to extract the sequences reported in the Perseus output file, as these tell us about the phosphosite.
+# We then need to convert them into standard FASTA format.
+# We do this for phosphopeptides rhythmic in WT cells, in CKO cells, and rhythmic in both.
+# NB: we also need to do it for the background set of all phosphopeptides detected - we created this file in Notebook 6.
+#
+# INPUTS = phosphopeptides that are rhythmic in WT, in CKO, or in both, as well as the complete background (.csv)
+# OUTPUTS = FASTA files of all 4 subsets, containing an identifier for each phosphopeptide paired with its amino acid sequence (.fasta).
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("seqinr")) {
+  install.packages("seqinr", dependencies = TRUE)
+  library(seqinr)
+} 
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+WT_data <- read.csv("WT.p_all_hits.csv", stringsAsFactors = F)
+CKO_data <- read.csv("CKO.p_all_hits.csv", stringsAsFactors = F)
+
+common_data <- read.csv("Common_phosphosites_list.csv", stringsAsFactors = F)
+
+background <- read.csv("Background_phosphosites.p.csv", stringsAsFactors = F)
+
+
+```
+
+
+```{r}
+# Select WT and CKO data from background in order to get the sequences!
+
+WT_selection <- background[which(background$Phosphosite_proteins %in% WT_data$Phosphosite),]
+CKO_selection <- background[which(background$Phosphosite_proteins %in% CKO_data$Phosphosite),]
+
+```
+
+
+```{r}
+# Make fasta files
+
+write.fasta(as.list(WT_selection$main_sequence), WT_selection$Phosphosite_proteins, "WT.fasta", open = "w", as.string = FALSE)
+write.fasta(as.list(CKO_selection$main_sequence), CKO_selection$Phosphosite_proteins, "CKO.fasta", open = "w", as.string = FALSE)
+write.fasta(as.list(common_data$Main_sequence), common_data$Phosphosite_proteins, "Overlap.fasta", open = "w", as.string = FALSE)
+write.fasta(as.list(background$main_sequence), background$Phosphosite_proteins, "Background.fasta", open = "w", as.string = FALSE)
+
+```
+

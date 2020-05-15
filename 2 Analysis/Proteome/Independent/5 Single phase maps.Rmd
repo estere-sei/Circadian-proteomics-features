@@ -1,0 +1,166 @@
+---
+title: "Analyse relative amplitude & phase"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 5 - DESCRIPTION
+#
+# Here we plot circular histograms, and do some circular stats.
+#
+# INPUTS = normalised data for biologically significantly rhythmic proteins (.csv)
+# OUTPUTS = circular histograms of phase, i.e. phase maps (.pdf)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("BiocManager")) {
+  install.packages("BiocManager", dependencies = TRUE)
+}
+
+if (!require("multiClust")) {
+  BiocManager::install("multiClust")
+  library(multiClust)
+} # package containing min/max normalisation function - NB: you need R version ≥ 3.6.0 for this!
+
+if (!require("gplots")) {
+  install.packages("gplots", dependencies = TRUE)
+  library(gplots)
+}
+
+if (!require("RColorBrewer")) {
+  install.packages("RColorBrewer", dependencies = TRUE)
+  library(RColorBrewer)
+}
+
+if (!require("circular")) {
+  install.packages("circular", dependencies = TRUE)
+  library(circular)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+#make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data files for WT
+WT_data_start <- read_csv("WT_big_hits.csv", col_names = TRUE)
+WT_data_only <- as_tibble(WT_data_start[9:ncol(WT_data_start)]) # Take only the data columns
+WT_norm_data <- as_tibble(t(apply(WT_data_only, 1, nor.min.max))) # Min-max normalise each protein, then transform the resulting matrix (the apply function gives the results in columns instead of rows), then convert it into a tibble
+WT_norm_data <- cbind(WT_data_start[,1:8], WT_norm_data) # Attach the protein names and stats to the min-max normalised data
+WT_sorted_input <- WT_norm_data %>% arrange(phase) #sort the data according to phase
+
+
+# SAME FOR CKO
+CKO_data_start <- read_csv("CKO_big_hits.csv", col_names = TRUE)
+CKO_data_only <- as_tibble(CKO_data_start[9:ncol(CKO_data_start)])
+CKO_norm_data <- as_tibble(t(apply(CKO_data_only, 1, nor.min.max)))
+CKO_norm_data <- cbind(CKO_data_start[,1:8], CKO_norm_data)
+CKO_sorted_input <- CKO_norm_data %>% arrange(phase)
+
+```
+
+
+```{r}
+# Plot circular histograms
+
+axis_colour = "grey85"
+axis_text_size = 10
+
+WT_phase <- ggplot(WT_sorted_input, aes(x = phase)) + 
+  geom_hline(yintercept = seq(0, 150, by = 30), colour = axis_colour, size = 0.2) +
+  geom_vline(xintercept = seq(3, 24, 3), colour = axis_colour, size = 0.2) +
+  geom_histogram(binwidth=3, aes(fill = ..count..)) +
+  scale_x_continuous(name = "WT \nRelative amplitude >10%",
+                     breaks = seq(3, 24, 3),
+                     position = "top") +
+  scale_fill_gradient("Count", low="blue", high="red") +
+  theme(axis.text.x = element_text(color = "black", size = axis_text_size, vjust = 0),
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        plot.background = element_rect(fill="transparent"),
+        panel.background = element_rect(fill = "transparent"),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size = axis_text_size)
+        ) +
+  coord_polar(theta = "x", start = (22.5*pi)/180, direction = 1) # CHANGE THE ANGLE IN TO ALTER ROTATION - must be in radians, or just add to the formula
+
+CKO_phase <- ggplot(CKO_sorted_input, aes(x = phase)) + 
+  geom_hline(yintercept = seq(0, 420, by = 70), colour = axis_colour, size = 0.2) +
+  geom_vline(xintercept = seq(3, 24, 3), colour = axis_colour, size = 0.2) +
+  geom_histogram(binwidth=3, aes(fill = ..count..)) +
+  scale_x_continuous(name = "CKO \nRelative amplitude >10%",
+                     breaks = seq(3, 24, 3),
+                     position = "top") +
+  scale_fill_gradient("Count", low="blue", high="red") +
+  theme(axis.text.x = element_text(color = "black", size = axis_text_size, vjust = 0),
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        plot.background = element_rect(fill="transparent"),
+        panel.background = element_rect(fill = "transparent"),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size = axis_text_size)
+        ) +
+  coord_polar(theta = "x", start = (22.5*pi)/180, direction = 1) # CHANGE THE ANGLE IN TO ALTER ROTATION - must be in radians, or just add to the formula
+
+
+pdf("Phase_maps.pdf")
+
+grid.arrange(WT_phase, CKO_phase, nrow = 1)
+
+dev.off()
+grid.arrange(WT_phase, CKO_phase, nrow = 1)
+
+```
+
+```{r}
+#######################################################################################################################################
+# Do circular statistics
+
+# NB: Circular Statistics in R (Pewsey et al. 2013) - a very good book to read, and justification for the analysis method.
+#######################################################################################################################################
+
+# Set up dataframes and convert phase into angles in radians
+
+WT <- WT_sorted_input[,1:8]
+CKO <- CKO_sorted_input[,1:8]
+
+WT$angle <- as.circular(WT$phase *(pi/12))
+CKO$angle <- as.circular(CKO$phase *(pi/12))
+
+#######################################################################################################################################
+# Watson's test for a common distribution (two samples)
+# Null hypothesis: the two datasets are drawn from the same circular distribution.
+#######################################################################################################################################
+
+watson.two.test(WT$angle, CKO$angle)
+
+```
+
+
+
+
+
+
+

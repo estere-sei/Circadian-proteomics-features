@@ -1,0 +1,159 @@
+---
+title: "Plotting a heatmap"
+output:
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 4 - DESCRIPTION
+#
+# Here we plot heatmaps of our rhythmic phosphopeptides
+# This is to make sure that our data processing methods hitherto look sensible by eye!
+# We sort the phosphopeptides by phase to make the plots have some sense, and to eye-ball for any phase patterns
+#
+# INPUTS = normalised data for rhythmic phosphopeptides (.csv)
+# OUTPUTS = heatmaps (.pdf)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("BiocManager")) {
+  install.packages("BiocManager", dependencies = TRUE)
+}
+
+if (!require("multiClust")) {
+  BiocManager::install("multiClust")
+  library(multiClust)
+} # package containing min/max normalisation function - NB: you need R version ≥ 3.6.0 for this!
+
+if (!require("gplots")) {
+  install.packages("gplots", dependencies = TRUE)
+  library(gplots)
+}
+
+if (!require("RColorBrewer")) {
+  install.packages("RColorBrewer", dependencies = TRUE)
+  library(RColorBrewer)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data files for WT
+WT_data_start <- read_csv("WT.p_all_hits.csv", col_names = TRUE)
+WT_data_only <- as_tibble(WT_data_start[11:ncol(WT_data_start)]) # Take only the data columns
+WT_norm_data <- as_tibble(t(apply(WT_data_only, 1, nor.min.max))) # Min-max normalise each protein, then transform the resulting matrix (the apply function gives the results in columns instead of rows), then convert it into a tibble
+WT_norm_data <- cbind(WT_data_start[,1:10], WT_norm_data) # Attach the protein names and stats to the min-max normalised data
+WT_sorted_input <- WT_norm_data %>% arrange(phase) #sort the data according to phase
+
+
+# SAME FOR CKO
+CKO_data_start <- read_csv("CKO.p_all_hits.csv", col_names = TRUE)
+CKO_data_only <- as_tibble(CKO_data_start[11:ncol(CKO_data_start)])
+CKO_norm_data <- as_tibble(t(apply(CKO_data_only, 1, nor.min.max)))
+CKO_norm_data <- cbind(CKO_data_start[,1:10], CKO_norm_data)
+CKO_sorted_input <- CKO_norm_data %>% arrange(phase)
+
+```
+
+```{r}
+#Create PDF for the heat map        
+pdf("CKO.p_Total_heatmap.pdf",    
+  width = 5,        
+  height = 7,
+  pointsize = 6)        # smaller font size
+
+
+#Plot the heatmap of min-max normalised intensities of all rhythmic phosphopeptides, sorted in order of phase
+
+Colours = rev(brewer.pal(5,"Spectral")) #Load a colour palette
+Colours <- colorRampPalette(Colours)(10)
+Breaks = seq(0, 1, 0.1)
+key_breaks = seq(0, 1, 0.5)
+
+heatmap.2(as.matrix(CKO_sorted_input[11:ncol(CKO_sorted_input)]),
+          Rowv = FALSE, 
+          Colv = FALSE,
+          col = Colours,
+          breaks = Breaks,
+          scale = "row", 
+          trace="none",
+          density.info="none",
+          dendrogram='none',
+          main = " ",
+          na.color='grey',
+          key=TRUE,
+          key.xlab = "Value",
+          keysize = 1,
+          symkey = FALSE,
+          key.xtickfun = function() {
+            list(at = parent.frame()$scale01(key_breaks),
+                 labels = key_breaks)
+          },
+          lhei = c(1,10),
+          labRow = FALSE,
+          labCol = seq(24,93,by=3),
+          margins=c(12,12)
+)
+
+dev.off()               # close the PDF device
+
+
+
+pdf("WT.p_Total_heatmap.pdf",    
+  width = 5,        
+  height = 7,
+  pointsize = 6)        # smaller font size
+
+
+#Plot the heatmap of min-max normalised intensities of all rhythmic phosphopeptides, sorted in order of phase
+
+Colours = rev(brewer.pal(5,"Spectral")) #Load a colour palette
+Colours <- colorRampPalette(Colours)(10)
+Breaks = seq(0, 1, 0.1)
+key_breaks = seq(0, 1, 0.5)
+
+heatmap.2(as.matrix(WT_sorted_input[11:ncol(WT_sorted_input)]),
+          Rowv = FALSE, 
+          Colv = FALSE,
+          col = Colours,
+          breaks = Breaks,
+          scale = "row", 
+          trace="none",
+          density.info="none",
+          dendrogram='none',
+          main = " ",
+          na.color='grey',
+          key=TRUE,
+          key.xlab = "Value",
+          keysize = 1,
+          symkey = FALSE,
+          key.xtickfun = function() {
+            list(at = parent.frame()$scale01(key_breaks),
+                 labels = key_breaks)
+          },
+          lhei = c(1,10),
+          labRow = FALSE,
+          labCol = seq(24,93,by=3),
+          margins=c(12,12)
+)
+
+dev.off()               # close the PDF device
+```
+

@@ -1,0 +1,172 @@
+---
+title: "Venn diagram for WT + CKO"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 6 - DESCRIPTION
+#
+# Here we find out which phosphopeptides are rhythmic in WT but not CKO and vice versa. 
+# We also find the overlap, i.e. which phosphopeptides are rhythmic in both genotypes.
+#
+# We are also loading the original raw file - this is so that we can make a background list, i.e. all phosphopeptides present in the experiment, even if they are only found in one genotype.
+#
+# INPUTS = normalised data for rhythmic phosphopeptides (.csv), raw data file from Perseus (.txt)
+# OUTPUTS = Venn diagrams (.pdf), subsets of interest and background phosphoproteome (.csv)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+#make a list of all the .csv and .txt files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+Y = list.files(".",".txt")
+
+# read the raw data files
+data_start <- read.delim("CRM3962_6set_MQ1633C_phos_noFil_m8b.txt", na = c("NaN"), stringsAsFactors = F) # Need this file for the sequences
+data_start <- data_start[-1, -1:-60] # Remove the first row which is just junk, and all data columns
+
+
+WT_data <- read.csv("WT.p_all_hits.csv", stringsAsFactors = F)
+CKO_data <- read.csv("CKO.p_all_hits.csv", stringsAsFactors = F)
+
+WT_total <- read.csv("WT.p_RAIN_results.csv", stringsAsFactors = F)
+CKO_total <- read.csv("CKO.p_RAIN_results.csv", stringsAsFactors = F)
+
+```
+
+```{r}
+# Fix gene names and phosphosites in original data set
+total_genes <- toupper(data_start$Gene.names)
+total_genes_list <- vector("list", length(data_start$Gene.names))
+for (i in 1:length(total_genes)) {
+  total_genes_list[i] <- strsplit(total_genes[i], ";")
+}
+total_genes_list <- unlist(lapply(total_genes_list, '[', 1))
+
+data_start$Phosphosite_proteins <- paste(data_start$Protein, "_", data_start$Amino.acid, data_start$Position, data_start$Multiplicity, sep = "")
+
+data_start$Phosphosite_genes <- paste(total_genes_list, "_", data_start$Amino.acid, data_start$Position, data_start$Multiplicity, sep = "")
+
+# Separate out the main sequnces
+sequences <- data_start$Sequence.window
+main_sequences <- vector("list", length(sequences)) # Create empty vector
+
+# For loop to either print the name or separate them if there are several in one line
+for (i in 1:length(sequences)) {
+  main_sequences[i] <- strsplit(sequences[i], ";")
+}
+# Select only the first element on each line --> this is the main protein for each line then attach it to the first column of the total proteome dataframe
+sequences <- unlist(lapply(main_sequences, '[[', 1))
+data_start$main_sequence <- sequences
+```
+
+```{r}
+# Define the background phosphoproteome - i.e. all unique proteins even if only present in one genotype
+
+background_phosphosites <- unique(c(WT_total$Phosphosite, CKO_total$Phosphosite))
+
+total_background <- data_start[which(data_start$Phosphosite_proteins %in% background_phosphosites), ]
+
+
+write.csv(total_background, "Background_phosphosites.p.csv", row.names = F)
+
+```
+
+
+```{r}
+# Extract from total dataset only the phosphosites that are present in both CKO + WT
+
+common_things <- data_start[which(data_start$Phosphosite_proteins %in% intersect(CKO_data$Phosphosite, WT_data$Phosphosite)), 24:ncol(data_start)]
+
+# Select pVal + relative amplitude for the intersecting proteins
+
+for (i in 1:nrow(common_things)) {
+  common_things$WT_pVal[i] <- WT_data[which(WT_data$Phosphosite %in% common_things$Phosphosite_proteins[i]), 6]
+  common_things$CKO_pVal[i] <- CKO_data[which(CKO_data$Phosphosite %in% common_things$Phosphosite_proteins[i]), 6]
+  common_things$WT_RA[i] <- WT_data[which(WT_data$Phosphosite %in% common_things$Phosphosite_proteins[i]), 10]
+  common_things$CKO_RA[i] <- CKO_data[which(CKO_data$Phosphosite %in% common_things$Phosphosite_proteins[i]), 10]
+  common_things$Gene_names[i] <- CKO_data[which(CKO_data$Phosphosite %in% common_things$Phosphosite_proteins[i]), 4]
+  common_things$Protein_names[i] <- CKO_data[which(CKO_data$Phosphosite %in% common_things$Phosphosite_proteins[i]), 3]
+  common_things$WT_phase[i] <- WT_data[which(WT_data$Phosphosite %in% common_things$Phosphosite_proteins[i]), 7]
+  common_things$CKO_phase[i] <- CKO_data[which(CKO_data$Phosphosite %in% common_things$Phosphosite_proteins[i]), 7]
+}
+
+# Make those columns numeric
+common_things$WT_pVal <- as.numeric(common_things$WT_pVal)
+common_things$CKO_pVal <- as.numeric(common_things$CKO_pVal)
+common_things$WT_RA <- as.numeric(common_things$WT_RA)
+common_things$CKO_RA <- as.numeric(common_things$CKO_RA)
+common_things$WT_phase <- as.numeric(common_things$WT_phase)
+common_things$CKO_phase <- as.numeric(common_things$CKO_phase)
+
+common_things_data <- cbind(WT_data[which(WT_data$Phosphosite %in% common_things$Phosphosite_proteins), 11:ncol(WT_data)], 
+                            CKO_data[which(CKO_data$Phosphosite %in% common_things$Phosphosite_proteins), 11:ncol(CKO_data)])
+
+colnames(common_things_data) <- c(paste("WT", seq(1:24)), paste("CKO", seq(1:24)))
+
+
+
+
+common_phosphosite_list <- cbind(Phosphosite_proteins = common_things$Phosphosite_proteins,
+                                 Phosphosite_genes = common_things$Phosphosite_genes,
+                                 Phosphosite_gene_names = common_things$Gene_names,
+                                 Protein_names = common_things$Protein_names,
+                                 Main_sequence = common_things$main_sequence,
+                                 WT_pVal = common_things$WT_pVal,
+                                 CKO_pVal = common_things$CKO_pVal,
+                                 WT_Relative_amplitude = common_things$WT_RA,
+                                 CKO_Relative_amplitude = common_things$CKO_RA,
+                                 WT_phase = common_things$WT_phase,
+                                 CKO_phase = common_things$CKO_phase,
+                                 common_things_data)
+
+write.csv(common_phosphosite_list, "Common_phosphosites_list.csv", row.names = F)
+
+```
+
+```{r}
+#Draw Venn diagram
+
+if (!require("VennDiagram")) {
+  install.packages("VennDiagram", dependencies = TRUE)
+  library(VennDiagram)
+} 
+
+overlap <- calculate.overlap(x = list("WT" = WT_data$Phosphosite, "CKO" = CKO_data$Phosphosite)) #calculate overlap to pass into venn diagram function
+
+venn.plot <- draw.pairwise.venn(length(overlap$a1), 
+                                length(overlap$a2), 
+                                length(overlap$a3), 
+                                euler.d = TRUE, 
+                                scaled = TRUE,
+                                rotation.degree = 180,
+                                fill = c("blue", "red"), 
+                                alpha = c(0.4, 0.4),
+                                lty = c(0,0), 
+                                cex = 2,
+                                cat.cex = 2.5, 
+                                cat.dist = c(0.001, 0.01),
+                                cat.prompts = TRUE
+                                )
+
+pdf("Venn_diagram_phospho.pdf", width = 5, height = 5)
+
+grid.draw(venn.plot)
+
+dev.off()
+
+```
+

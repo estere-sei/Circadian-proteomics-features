@@ -1,0 +1,108 @@
+---
+title: "Abundance vs rhythmicity tests"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Combined analysis Notebook 6 - DESCRIPTION
+#
+# Here we divide up the WT + CKO proteomes into deciles of abundance.
+# We then calculate the proportion of each decile that is rhythmic.
+# We export the data for plotting elsewhere.
+#
+# INPUTS = All normalised data, rhythmic datasets including relative amplitudes and baselines (.csv)
+# OUTPUTS = For each genotype, the deciles with average abundance for each as well as proportion rhythmic (.csv)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+```
+
+```{r}
+# Import datasets
+
+data_start <- read.csv("All_normalised_data.csv",stringsAsFactors = F)
+
+WT_total <- cbind(data_start[, 1:3], data_start[, 4:27])
+CKO_total <- cbind(data_start[, 1:3], data_start[, 28:ncol(data_start)])
+
+# Calcuate abundance of total protein datasets + take the log
+WT_total$abundance <- apply(WT_total[, 4:ncol(WT_total)], 1, mean)
+WT_total$logabundance <- log10(WT_total$abundance)
+CKO_total$abundance <- apply(CKO_total[, 4:ncol(CKO_total)], 1, mean)
+CKO_total$logabundance <- log10(CKO_total$abundance)
+
+# Load the rhythmic proteins - only the metadata is needed
+WT_hits <- read.csv("WT_RA_B.csv", stringsAsFactors = F)
+WT_hits <- WT_hits[, 1:9]
+CKO_hits <- read.csv("CKO_RA_B.csv", stringsAsFactors = F)
+CKO_hits <- CKO_hits[, 1:9]
+
+```
+
+```{r}
+# Assign each protein a decile
+
+WT_total$decile <- ntile(WT_total$logabundance, 10)
+CKO_total$decile <- ntile(CKO_total$logabundance, 10)
+
+```
+
+```{r}
+# For each decile, calculate the proportion that are rhythmic - create function
+
+calculate_proportion <- function(total, rhythmic, x) {
+  a <- total[which(total$decile == x), ] # Extract the desired decile
+  b <- mean(a$logabundance)
+  c <- total[which(a$uniprot %in% rhythmic$Uniprot_ID), ] # Extract the ones in the decile which are rhythmic
+  d <- 100* nrow(c) / nrow(a) # calculate the proportion of the decile that appears in the rhythmic set
+  
+  output <- c(b, d)
+  return(output)
+}
+
+```
+
+```{r}
+# Calculations for WT + CKO
+rhythmic_proportions <- matrix(0, nrow = 10, ncol = 5) # Initialise empty matrix
+
+for (i in 1:10) {
+  rhythmic_proportions[i, 1] <- i # make the first column decile number
+  rhythmic_proportions[i, 2:3] <- calculate_proportion(WT_total, WT_hits, i) # Calculate for WT
+  rhythmic_proportions[i, 4:5] <- calculate_proportion(CKO_total, CKO_hits, i) # Calculate for CKO
+  }
+
+rhythmic_proportions <- as.data.frame(rhythmic_proportions)
+colnames(rhythmic_proportions) <- c("Decile", 
+                                    "WT average", "WT proportion", 
+                                    "CKO average", "CKO proportion")
+
+
+```
+
+```{r}
+# Export
+write.csv(rhythmic_proportions, "Rhythmic proportions.csv", row.names = F)
+
+```
+

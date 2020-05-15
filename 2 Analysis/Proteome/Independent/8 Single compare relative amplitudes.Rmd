@@ -1,0 +1,172 @@
+---
+title: "Comparing relative amplitudes"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 8 - DESCRIPTION
+#
+# Here, we compare relative amplitudes of various subsets of proteins.
+# At the end, we also extract and export proteins that are rhythmic in both genotypes.
+# For these, we also calculate the fold-change in relative amplitudes and export this information for plotting elsewhere. 
+#
+# INPUTS = all proteins detected as rhythmic by RAIN (.csv)
+# OUTPUTS = histograms and density plots comparing relative amplitudes (.pdf), list of fold-changes in relative amplitudes between genotypes (.csv).
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+if (!require("Matching")) {
+  install.packages("Matching", dependencies = TRUE)
+  library(Matching)
+}
+
+library(reshape2)
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data files
+
+WT_hits <- read.csv("WT_all_hits.csv", stringsAsFactors = FALSE)
+WT_hits <- WT_hits[, 1:8]
+
+CKO_hits <- read.csv("CKO_all_hits.csv", stringsAsFactors = FALSE)
+CKO_hits <- CKO_hits[, 1:8]
+
+```
+
+
+```{r}
+# Log10 transform of relative amplitudes - therefore you can use t tests on these
+
+WT_hits$Log10RA <- log10(WT_hits$WT_Relative_amplitudes)
+CKO_hits$Log10RA <- log10(CKO_hits$CKO_Relative_amplitudes)
+
+t.test(WT_hits$Log10RA, CKO_hits$Log10RA) # t test with Welch correction
+
+ks.test(WT_hits$WT_Relative_amplitudes, CKO_hits$CKO_Relative_amplitudes) # Non-parametric test with raw data to check
+
+# Print the medians to have a look
+median(WT_hits$WT_Relative_amplitudes)
+median(CKO_hits$CKO_Relative_amplitudes)
+
+```
+
+```{r}
+# Plot histograms
+
+colnames(WT_hits)[5] = c("RA")
+colnames(CKO_hits)[5] = c("RA")
+
+
+axis_text_size = 12
+axis_label_size = 12
+
+histogram <- function(data) {
+  ggplot(data, aes(x = log10(RA))) + 
+  geom_histogram(binwidth = 0.1, col = "white") +
+  xlim(-1.6, 0.2) +
+  theme( # make it look nice
+  panel.border = element_blank(),  
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  axis.line = element_line(colour = "black"),
+  axis.text=element_text(colour="black", size = axis_text_size),
+  axis.title = element_text(colour = "black", size = axis_label_size)) +
+  labs(title = deparse(substitute(data))) +
+  ylab("Count")
+}
+
+
+p1 <- histogram(WT_hits)
+p2 <- histogram(CKO_hits)
+
+ggsave(plot = grid.arrange(p1, p2, nrow = 2),
+       "RA histograms.pdf",
+       width = 5, height = 8)
+
+grid.arrange(p1, p2, nrow = 2)
+
+```
+
+```{r}
+# Use density plots to visualise WT + CKO together (for sanity - these are not good for presentation because the distributions are so close together)
+
+desnsity_plots <- cbind(WT_hits$Log10RA, CKO_hits$Log10RA)
+colnames(desnsity_plots) <- c("WT", "CKO")
+desnsity_plots <- melt(desnsity_plots)
+desnsity_plots <- desnsity_plots[, -1]
+colnames(desnsity_plots) <- c("Genotype", "Log10RA")
+
+WT_plot <- ggplot(desnsity_plots, aes(x = Log10RA, fill = Genotype)) + 
+  geom_density(alpha = 0.5) + 
+  scale_fill_manual(values= c("grey", "red")) +
+  labs(title = "Relative amplitude distribution", x = expression("Log"[10]*"(Relative amplitude)"), y = "Probability density") +
+  theme(
+  # Remove panel border
+  panel.border = element_blank(),  
+  # Remove panel grid lines
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  # Remove panel background
+  panel.background = element_blank(),
+  # Add axis line
+  axis.line = element_line(colour = "black"),
+  axis.text=element_text(colour="black")
+  )
+
+WT_plot
+
+ggsave(WT_plot, file="Density plots relative amplitude.pdf", width=4, height=3)
+```
+
+```{r}
+# How many CKO rhythmic proteins are rhythmic in WT but below the 10% RA threshold?
+
+common_genes <- intersect(CKO_hits$Gene_names, WT_hits$Gene_names)
+
+common_list <- cbind(common_genes)
+common_list <- as.data.frame(common_list)
+
+common_list <- as.data.frame(common_list[!is.na(common_list)])
+colnames(common_list) <- c("common_genes")
+
+# Select pVal + relative amplitude for the intersecting proteins
+
+for (i in 1:nrow(common_list)) {
+  common_list$WT_pVal[i] <- WT_hits[which(WT_hits$Gene_names %in% common_list$common_genes[i]), 4]
+  common_list$CKO_pVal[i] <- CKO_hits[which(CKO_hits$Gene_names %in% common_list$common_genes[i]), 4]
+  common_list$WT_RA[i] <- WT_hits[which(WT_hits$Gene_names %in% common_list$common_genes[i]), 5]
+  common_list$CKO_RA[i] <- CKO_hits[which(CKO_hits$Gene_names %in% common_list$common_genes[i]), 5]
+}
+
+colnames(common_list) <- c("Gene name", "WT pVal", "CKO pVal", "WT Relative Amplitude", "CKO Relative Amplitude")
+
+c <- common_list
+
+c$`Protein name` <- WT_hits[which(WT_hits$Gene_names %in% c$`Gene name`) ,2]
+c$uniprot <- WT_hits[which(WT_hits$Gene_names %in% c$`Gene name`) ,1]
+c$amplification <- c$`CKO Relative Amplitude` / c$`WT Relative Amplitude`
+c$logamp <- log10(c$amplification)
+write.csv(c, "CKO_all_amplified_proteins.csv", row.names = F)
+```

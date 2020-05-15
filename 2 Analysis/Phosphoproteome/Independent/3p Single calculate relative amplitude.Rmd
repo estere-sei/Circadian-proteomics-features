@@ -1,0 +1,133 @@
+---
+title: "Estimating relative amplitude of rhythmic phosphopeptides"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 3 - DESCRIPTION
+#
+# Here we estimate relative amplitude for each phosphopeptide.
+# Relative amplitude = range / mean abundance,
+# To calculate range, we use a 24-hour moving average method to detrend data before subtracting max - min.
+# This allows the elimination of >24h trends (e.g. if everything is decreasing over several days)
+#
+# No relative amplitude threshold is used in phosphoproteomics because there is no evidence to suggest that small changes are biologically insignificant.
+#
+# INPUTS = normalised data for significantly rhythmic phosphopeptide output by RAIN (.csv)
+# OUTPUTS = detrended data, lists of phosphopeptide with relative amplitudes calculated (.csv)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup 
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+
+# read the raw data files
+WT_data <- read.csv("WT_phosphoproteome_all_significant_RAIN.csv")
+WT_data_start <- WT_data[,-1:-9]
+WT_data_start <- t(WT_data_start)
+colnames(WT_data_start) <- WT_data$Uniprot_ID
+
+
+CKO_data <- read.csv("CKO_phosphoproteome_all_significant_RAIN.csv")
+CKO_data_start <- CKO_data[,-1:-9]
+CKO_data_start <- t(CKO_data_start)
+colnames(CKO_data_start) <- CKO_data$Uniprot_ID
+
+```
+
+```{r}
+#Detrend the data using a 24h moving average
+#Set up useful parameters for detrending
+
+period = 24     #set period length to detrend
+n_samples = ncol(WT_data_start)   #total number of samples
+
+time <- seq(24,93,3)   #list of time-points
+row_days = round(period/(time[2] - time [1]))    #number of rows that correspond to 24 hours (or 1 period length)
+
+WT_detrended_data <- matrix(nrow=length(WT_data_start[,1]) - (row_days), ncol=ncol(WT_data_start))  #initialise a new matrix for the detrended data, excluding the first and last 12 hours (i.e. half of period)
+colnames(WT_detrended_data) <- colnames(WT_data_start)     #set up the column names
+
+#Fill up the matrix with the detrended data
+for (i in 1:n_samples){
+  for (j in 1:length(WT_detrended_data[,1])){
+   WT_detrended_data[j,i] = WT_data_start[row_days/2+j,i] - mean(WT_data_start[j:(j + row_days),i])
+  }
+}
+
+#Export the detrended data as a .csv file
+write.csv(WT_detrended_data, file = "WT.p_Detrended_data.csv", row.names = F)
+
+
+# SAME FOR CKO
+period = 24     #set period length to detrend
+n_samples = ncol(CKO_data_start)   #total number of samples
+time <- seq(24,93,3)   #list of time-points
+row_days = round(period/(time[2] - time [1]))    #number of rows that correspond to 24 hours (or 1 period length)
+
+CKO_detrended_data <- matrix(nrow=length(CKO_data_start[,1]) - (row_days), ncol=ncol(CKO_data_start))  #initialise a new matrix for the detrended data, excluding the first and last 12 hours (i.e. half of period)
+colnames(CKO_detrended_data) <- colnames(CKO_data_start)     #set up the column names
+
+#Fill up the matrix with the detrended data
+for (i in 1:n_samples){
+  for (j in 1:length(CKO_detrended_data[,1])){
+   CKO_detrended_data[j,i] = CKO_data_start[row_days/2+j,i] - mean(CKO_data_start[j:(j + row_days),i])
+  }
+}
+
+#Export the detrended data as a .csv file
+write.csv(CKO_detrended_data, file = "CKO.p_Detrended_data.csv", row.names = F)
+```
+
+```{r}
+#Calculate relative amplitude
+
+#Calculate Means of each column
+WT_Baselines <- as_tibble(colMeans(WT_data_start))
+WT_Baselines <- rename(WT_Baselines, Means = value)
+
+#Calculate peak-trough amplitude from detrended data
+
+WT_Amplitudes <- as_tibble(apply(WT_detrended_data, 2, function(df) {max(df)-min(df)}))
+
+WT_Relative_amplitudes <- as_tibble(WT_Amplitudes/WT_Baselines)
+WT_Relative_amplitudes <- rename(WT_Relative_amplitudes, WT_Relative_amplitudes = value)
+
+
+
+#Calculate Means of each column
+CKO_Baselines <- as_tibble(colMeans(CKO_data_start))
+CKO_Baselines <- rename(CKO_Baselines, Means = value)
+
+#Calculate peak-trough amplitude from detrended data
+
+CKO_Amplitudes <- as_tibble(apply(CKO_detrended_data, 2, function(df) {max(df)-min(df)}))
+
+CKO_Relative_amplitudes <- as_tibble(CKO_Amplitudes/CKO_Baselines)
+CKO_Relative_amplitudes <- rename(CKO_Relative_amplitudes, CKO_Relative_amplitudes = value)
+```
+
+```{r}
+#Export files
+
+WT_total_data <- cbind(WT_data[1:9], WT_Relative_amplitudes, WT_data[10:ncol(WT_data)])
+write.csv(WT_total_data, "WT.p_all_hits.csv", row.names = F)
+
+CKO_total_data <- cbind(CKO_data[1:9], CKO_Relative_amplitudes, CKO_data[10:ncol(CKO_data)])
+write.csv(CKO_total_data, "CKO.p_all_hits.csv", row.names = F)
+
+```
+

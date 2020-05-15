@@ -1,0 +1,266 @@
+---
+title: "Analyse relative amplitude & phase & pie charts"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 7 - DESCRIPTION
+#
+# This is an extension of the Notebook 5, plotting circular histograms to compare the phases of different subsets of proteins.
+# Note that this notebook requires the output of Notebook 6, where these subsets were defined.
+#
+# INPUTS = subsets of biologically significantly rhythmic proteins (.csv)
+# OUTPUTS = circular histograms of phase, i.e. phase maps (.pdf)
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+if (!require("circular")) {
+  install.packages("circular", dependencies = TRUE)
+  library(circular)
+}
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+```
+
+```{r}
+# Read data files
+
+WT_only <- read.csv("Rhythmic_in_WT_only.csv", stringsAsFactors = F)
+CKO_only <- read.csv("Rhythmic_in_CKO_only.csv", stringsAsFactors = F)
+
+common <- read.csv("Common_proteins_list.csv", stringsAsFactors = F)
+
+```
+
+```{r}
+# Create plotting function
+axis_colour = "grey85"
+axis_text_size = 14
+legend_text_size = 12
+
+phasemap <- function(data, ymax, yint, title) {
+  ggplot(data, aes(x = phase)) + 
+  geom_hline(yintercept = seq(0, ymax, by = yint), colour = axis_colour, size = 0.2) + #define how many concentric circles
+  geom_vline(xintercept = seq(3, 24, 3), colour = axis_colour, size = 0.2) + #define how many spokes of the wheel
+  geom_histogram(binwidth=3, aes(fill = ..count..)) +
+  scale_x_continuous(name = title,
+                     breaks = seq(3, 24, 3),
+                     position = "top") +
+  scale_fill_gradient("Count", low="blue", high="red") +
+  theme(axis.text.x = element_text(color = "black", size = axis_text_size, vjust = 0),
+        axis.title.x = element_text(size = axis_text_size),
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        plot.background = element_rect(fill="transparent"),
+        panel.background = element_rect(fill = "transparent"),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size = legend_text_size)
+        ) +
+  coord_polar(theta = "x", start = (22.5*pi)/180, direction = 1) # Rotate so that 24/0 is at the top
+}
+
+```
+
+```{r}
+# plot and export proteins rhythmic in a single genotype
+WT_plt <- phasemap(data = WT_only, ymax = 80, yint = 20, title = "Rhythmic in WT only")
+CKO_plt <- phasemap(data = CKO_only, ymax = 300, yint = 50, title = "Rhythmic in CKO only")
+
+grid.arrange(WT_plt, CKO_plt, nrow = 1)
+
+ggsave(filename = "Phase.maps.1.pdf", 
+       plot = grid.arrange(WT_plt, CKO_plt, nrow = 1), 
+       device = "pdf")
+```
+
+```{r}
+# plot and export proteins rhythmic in both genotypes
+WT_plt2 <- ggplot(common, aes(x = WT.phase)) + 
+  geom_hline(yintercept = seq(0, 80, by = 20), colour = axis_colour, size = 0.2) + #define how many concentric circles
+  geom_vline(xintercept = seq(3, 24, 3), colour = axis_colour, size = 0.2) + #define how many spokes of the wheel
+  geom_histogram(binwidth=3, aes(fill = ..count..)) +
+  scale_x_continuous(name = "Common rhythmic - WT",
+                     breaks = seq(3, 24, 3),
+                     position = "top") +
+  scale_fill_gradient("Count", low="blue", high="red") +
+  theme(axis.text.x = element_text(color = "black", size = axis_text_size, vjust = 0),
+        axis.title.x = element_text(size = axis_text_size),
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        plot.background = element_rect(fill="transparent"),
+        panel.background = element_rect(fill = "transparent"),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size = legend_text_size)
+        ) +
+  coord_polar(theta = "x", start = (22.5*pi)/180, direction = 1)
+
+  
+  
+
+CKO_plt2 <- ggplot(common, aes(x = CKO.phase)) + 
+  geom_hline(yintercept = seq(0, 100, by = 20), colour = axis_colour, size = 0.2) + #define how many concentric circles
+  geom_vline(xintercept = seq(3, 24, 3), colour = axis_colour, size = 0.2) + #define how many spokes of the wheel
+  geom_histogram(binwidth=3, aes(fill = ..count..)) +
+  scale_x_continuous(name = "Common rhythmic - CKO",
+                     breaks = seq(3, 24, 3),
+                     position = "top") +
+  scale_fill_gradient("Count", low="blue", high="red") +
+  theme(axis.text.x = element_text(color = "black", size = axis_text_size, vjust = 0),
+        axis.title.x = element_text(size = axis_text_size),
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        plot.background = element_rect(fill="transparent"),
+        panel.background = element_rect(fill = "transparent"),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size = legend_text_size)
+        ) +
+  coord_polar(theta = "x", start = (22.5*pi)/180, direction = 1)
+  
+  
+
+
+grid.arrange(WT_plt2, CKO_plt2, nrow = 1)
+
+ggsave(filename = "Phase.maps.2.pdf", 
+       plot = grid.arrange(WT_plt2, CKO_plt2, nrow = 1), 
+       device = "pdf")
+```
+
+
+```{r}
+# Which proteins are rhythmic in both AND have a similar phase?
+
+common$WT.phase <- as.numeric(common$WT.phase)
+common$CKO.phase <- as.numeric(common$CKO.phase)
+
+b <- common[which((common$WT.phase == common$CKO.phase) | # These have exactly the same phase
+                    (common$WT.phase == (common$CKO.phase + 3)) | # These have phase 3h apart (CKO>WT)
+                    (common$WT.phase == (common$CKO.phase - 3)) | # These have phase 3h apart (CKO<WT)
+                    (common$WT.phase == 3 & common$CKO.phase == 24) | # These have phase 3h apart with CKO at 0/24
+                    (common$WT.phase == 24 & common$CKO.phase == 3) # These have phase 3h apart with WT at 0/24
+                  ),]
+
+m <- cor.test(b$WT.phase, b$CKO.phase, method = "spearman")
+
+plot <- ggplot(b, aes(x = WT.phase, y = CKO.phase)) +
+  geom_point() + 
+  geom_smooth(method=lm) +
+  theme( # make it look nice
+  panel.border = element_blank(),  
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  axis.line = element_line(colour = "black"),
+  axis.text=element_text(colour="black", size = 12),
+  axis.title = element_text(colour = "black", size = 12)) +
+  labs(title = paste("rho = ", format(round(m$estimate, 2), nsmall = 2), ", ",
+                     "p = ", format(round(m$p.value, 2), nsmall = 2)))
+
+WT_plt3 <- ggplot(b, aes(x = WT.phase)) + 
+  geom_hline(yintercept = seq(0, 100, by = 20), colour = axis_colour, size = 0.2) + #define how many concentric circles
+  geom_vline(xintercept = seq(3, 24, 3), colour = axis_colour, size = 0.2) + #define how many spokes of the wheel
+  geom_histogram(binwidth=3, aes(fill = ..count..)) +
+  scale_x_continuous(name = "Common phase - WT",
+                     breaks = seq(3, 24, 3),
+                     position = "top") +
+  scale_fill_gradient("Count", low="blue", high="red") +
+  theme(axis.text.x = element_text(color = "black", size = axis_text_size, vjust = 0),
+        axis.title.x = element_text(size = axis_text_size),
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        plot.background = element_rect(fill="transparent"),
+        panel.background = element_rect(fill = "transparent"),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size = legend_text_size)
+        ) +
+  coord_polar(theta = "x", start = (22.5*pi)/180, direction = 1)
+
+  
+  
+
+CKO_plt3 <- ggplot(b, aes(x = CKO.phase)) + 
+  geom_hline(yintercept = seq(0, 100, by = 20), colour = axis_colour, size = 0.2) + #define how many concentric circles
+  geom_vline(xintercept = seq(3, 24, 3), colour = axis_colour, size = 0.2) + #define how many spokes of the wheel
+  geom_histogram(binwidth=3, aes(fill = ..count..)) +
+  scale_x_continuous(name = "Common phase - CKO",
+                     breaks = seq(3, 24, 3),
+                     position = "top") +
+  scale_fill_gradient("Count", low="blue", high="red") +
+  theme(axis.text.x = element_text(color = "black", size = axis_text_size, vjust = 0),
+        axis.title.x = element_text(size = axis_text_size),
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        plot.background = element_rect(fill="transparent"),
+        panel.background = element_rect(fill = "transparent"),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size = legend_text_size)
+        ) +
+  coord_polar(theta = "x", start = (22.5*pi)/180, direction = 1)
+  
+  
+
+
+grid.arrange(WT_plt3, CKO_plt3, plot, nrow = 2)
+
+ggsave(filename = "Phase.maps.3.pdf", 
+       plot = grid.arrange(WT_plt3, CKO_plt3, nrow = 1), 
+       device = "pdf")
+```
+
+```{r}
+#######################################################################################################################################
+# Do circular statistics
+
+# NB: Circular Statistics in R (Pewsey et al. 2013) - a very good book to read, and justification for the analysis method.
+#######################################################################################################################################
+
+# Set up dataframes and convert phase into angles in radians
+
+WT <- WT_only[,1:8]
+CKO <- CKO_only[,1:8]
+
+WT$angle <- as.circular(WT$phase *(pi/12))
+CKO$angle <- as.circular(CKO$phase *(pi/12))
+
+#######################################################################################################################################
+# Watson's test for a common distribution (two samples)
+# Null hypothesis: the two datasets are drawn from the same circular distribution.
+#######################################################################################################################################
+
+watson.two.test(WT$angle, CKO$angle)
+
+```
