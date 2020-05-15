@@ -1,11 +1,11 @@
 # Circadian-proteomics
- Custom analysis of in vitro circadian timecourse proteomics and phosphoproteomics using multiple sets of 10plex TMT with two genotypes
+Custom analysis of in vitro circadian timecourse proteomics and phosphoproteomics using multiple sets of 10plex TMT with two genotypes
  
-# DESCRIPTION
+# Description
 
 These are the R Notebooks used in Wong et al. 2020 to analyse multiplexed proteomics and phosphoproteomics data. See this paper for context and experimental design.
 
-REFERENCE HERE.
+>REFERENCE HERE.
 
 Pooled samples theoretically contain the average levels of all proteins collected during the experiment, including WT and CKO cells. Strict inclusion criteria were used in the analysis - proteins had to be present in all samples in a particular analysis as well as both pooled samples. This was also mathematically required for the sample loading normalisation since it involves taking the sum of all intensities in each column (timepoint).
 
@@ -19,38 +19,37 @@ Phosphoproteomics is handled in a similar way to proteomics. However, phosphopep
 
 For the half-life analysis in the "Proteome" folder, this was forked from Estere Seinkmane's work. For queries about upstream work please contact her directly.
 
-# STRUCTURE
+## STRUCTURE
 
 The root directory contains:
-    "1 Raw files from Perseus" -> proteomics + phosphoproteomics .txt files.
-    "2 Analyis" -> split into "Proteome" and "Phosphoproteome".
-    "README.txt".
-
+   * "1 Raw files from Perseus" -> proteomics + phosphoproteomics .txt files.
+   * "2 Analysis" -> split into "Proteome" and "Phosphoproteome".
+    
 The "2 Analysis" folder contains:
-    "Phosphoproteome".
-    "Proteome".
+   * "Phosphoproteome".
+   * "Proteome".
 
 Each of "Phosphoproteome" and "Proteome" folders contains:
-    "Combined".
-    "Independent" - R notebooks all begin with "Single" to denote that it is associated with the "Independent" analysis rather than "Combined".
+   * "Combined".
+   * "Independent" - R notebooks all begin with "Single" to denote that it is associated with the "Independent" analysis rather than "Combined".
     
 Each of "Combined" and "Independent" folders contains:
-    R notebooks - these are numbered in the order in which they are to be run, and each begins with a short description and a summary of input/output files. Numbers are appended with "p" when referring to phosphoproteomics analysis, e.g. "1p Normalising data.Rmd".
-    The relevant raw file from Perseus (either proteomics or phosphoproteomics).
-    Other relevant input files (e.g. manually annotated lists of interesting proteins).
-    Output files (created by running the R notebooks in the specified order).
+   * R notebooks - these are numbered in the order in which they are to be run, and each begins with a short description and a summary of input/output files. Numbers are appended with "p" when referring to phosphoproteomics analysis, e.g. "1p Normalising data.Rmd".
+   * The relevant raw file from Perseus (either proteomics or phosphoproteomics).
+   * Other relevant input files (e.g. manually annotated lists of interesting proteins).
+   * Output files (created by running the R notebooks in the specified order).
     
 For the kinase inference analysis the script was written in Python by Dr Tim Stevens. For further help email tjs23@cam.ac.uk
 
-# VERSION INFORMATION
+## VERSION INFORMATION
 
 R 3.6.3
 
-# CONTACT
+## CONTACT
 
-David C.S. Wong
-davidwong47@gmail.com
+* David C.S. Wong
+* Email: davidwong47@gmail.com
 
-# LICENSE
+## LICENSE
 
-This code is released with the MIT License. See the License.txt file for more information.
+This code is released with the [MIT License](LICENSE).
