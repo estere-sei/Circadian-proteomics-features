@@ -3,7 +3,7 @@ Custom analysis of in vitro circadian timecourse proteomics and phosphoproteomic
  
 # Description
 
-These are the R Notebooks used in Wong et al. 2020 to analyse multiplexed proteomics and phosphoproteomics data. See this paper for context and experimental design.
+These are the R Notebooks used in Wong et al. 2020 to analyse multiplexed proteomics and phosphoproteomics data. See this paper for context and experimental design. Almost all analysis was done in R.
 
 >REFERENCE HERE.
 
@@ -39,7 +39,7 @@ Each of "Combined" and "Independent" folders contains:
    * Other relevant input files (e.g. manually annotated lists of interesting proteins).
    * Output files (created by running the R notebooks in the specified order).
     
-For the kinase inference analysis the script was written in Python by Dr Tim Stevens. For further help email tjs23@cam.ac.uk
+For the kinase inference analysis the script was written by Dr Tim Stevens. For further help email tjs23@cam.ac.uk
 
 ## VERSION INFORMATION
 
