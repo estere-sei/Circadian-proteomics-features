@@ -1,11 +1,9 @@
 # Circadian-proteomics
-Custom analysis of in vitro circadian timecourse proteomics and phosphoproteomics using multiple sets of 10plex TMT with two genotypes.
- 
-# Description
-
-These are the R Notebooks used in Wong et al. 2020 to analyse multiplexed proteomics and phosphoproteomics data. See this paper for context and experimental design.
+Custom analysis of in vitro circadian timecourse proteomics and phosphoproteomics using multiple sets of 10plex TMT. This code accompanies the manuscript Wong et al. 2020. See this paper for context and experimental design. The code in this repository was not designed to be run on other datasets, and is made public for transparency.
 
 >REFERENCE HERE.
+ 
+# Details
 
 Pooled samples theoretically contain the average levels of all proteins collected during the experiment, including WT and CKO cells. Strict inclusion criteria were used in the analysis - proteins had to be present in all samples in a particular analysis as well as both pooled samples. This was also mathematically required for the sample loading normalisation since it involves taking the sum of all intensities in each column (timepoint).
 
