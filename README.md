@@ -15,9 +15,7 @@ Apart from the independent vs combined distinction, the workflow thence is stand
 
 Phosphoproteomics is handled in a similar way to proteomics. However, phosphopeptide levels are adjusted to take into account changes in the abundance of the associated protein. Therefore the normalised protein abundances are required for phosphoproteomics analysis. This was designed because we were interested in changes in phosphorylation, rather than changes in the abundance of the underlying protein. This means that we only include phosphopeptides for which we have proteome data, thus reducing our coverage as an unfortunate side effect.
 
-For the half-life analysis in the "Proteome" folder, this was forked from Estere Seinkmane's work. For queries about upstream work please contact her directly.
-
-## STRUCTURE
+## Directory structure
 
 The root directory contains:
 * "1 Raw files from Perseus" -> proteomics + phosphoproteomics .txt files.
@@ -36,17 +34,15 @@ Each of "Combined" and "Independent" folders contains:
 * The relevant raw file from Perseus (either proteomics or phosphoproteomics).
 * Other relevant input files (e.g. manually annotated lists of interesting proteins).
 * Output files (created by running the R notebooks in the specified order).
-    
-For the kinase inference analysis the script was written in Python by Dr Tim Stevens. For further help email tjs23@cam.ac.uk
 
+## Credits
+* The half-life analysis was done by Estere Seinkmane. 
+* The kinase inference analysis script was written in Python by Dr Tim Stevens.
+* The group leader supporting this work was Dr John S. O'Neill, MRC Laboratory of Molecular Biology.
+    
 ## VERSION INFORMATION
 
 R 3.6.3
-
-## CONTACT
-
-* David C.S. Wong
-* Email: davidwong47@gmail.com
 
 ## LICENSE
 
