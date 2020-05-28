@@ -1,13 +1,13 @@
 # Circadian-proteomics
-Custom analysis of in vitro circadian timecourse proteomics and phosphoproteomics using multiple sets of 10plex TMT. This code accompanies the manuscript Wong et al. 2020. See this paper for context and experimental design. The code in this repository was not designed to be run on other datasets, and is made public for transparency.
+Custom analysis of in vitro circadian timecourse proteomics and phosphoproteomics using multiple sets of 10plex TMT. This code accompanies the manuscript [Wong et al. 2020](https://doi.org/10.1101/2020.05.16.099556). See this paper for context and experimental design. The code in this repository was not designed to be run on other datasets, and is made public for transparency.
 
->REFERENCE HERE.
+>**CRYPTOCHROME suppresses the circadian proteome and promotes protein homeostasis.** <br />David C.S. Wong, Estere Seinkmane, Alessandra Stangherlin, Aiwei Zeng, Nina M. Rzechorzek, Andrew D. Beale, Jason Day, Martin Reed, Sew Peak Chew, Marrit Putker, John O’Neill. <br />bioRxiv 2020.05.16.099556; doi: https://doi.org/10.1101/2020.05.16.099556 
  
-# Details
+## Details
 
 Pooled samples theoretically contain the average levels of all proteins collected during the experiment, including WT and CKO cells. Strict inclusion criteria were used in the analysis - proteins had to be present in all samples in a particular analysis as well as both pooled samples. This was also mathematically required for the sample loading normalisation since it involves taking the sum of all intensities in each column (timepoint).
 
-Sample loading normalisation was used to correct for minor pipetting errors during the preparation for mass spectrometry (i.e. TMT labelling etc). Internal reference normalisation was used to correct for batch effects, since the experimental design is multiplexed. The code is an adaptation of the example published by Phil Wilmarth (https://github.com/pwilmart/IRS_normalization).
+Sample loading normalisation was used to correct for minor pipetting errors during the preparation for mass spectrometry (i.e. TMT labelling etc). Internal reference normalisation was used to correct for batch effects, since the experimental design is multiplexed. The code is an adaptation of the [example](https://github.com/pwilmart/IRS_normalization) published by Phil Wilmarth.
 
 These analyses are split into "Independent" and "Combined" analyses, where the dataset is split into genotypes either before or after normalisation, respectively. The independent analysis allows the detection of all the proteins including those that would have been excluded because they are only present in one genotype. Naturally, this means that comparisons of absolute abundance between genotypes. The combined analysis allows this because batch correction occurs before splitting up the data. Therefore the combined analysis was used when comparing expression levels between genotypes, as well as when comparing the relationships between abundance deciles and proportion rhythmic.
 
@@ -15,7 +15,7 @@ Apart from the independent vs combined distinction, the workflow thence is stand
 
 Phosphoproteomics is handled in a similar way to proteomics. However, phosphopeptide levels are adjusted to take into account changes in the abundance of the associated protein. Therefore the normalised protein abundances are required for phosphoproteomics analysis. This was designed because we were interested in changes in phosphorylation, rather than changes in the abundance of the underlying protein. This means that we only include phosphopeptides for which we have proteome data, thus reducing our coverage as an unfortunate side effect.
 
-## Directory structure
+### Directory structure
 
 The root directory contains:
 * "1 Raw files from Perseus" -> proteomics + phosphoproteomics .txt files.
@@ -35,15 +35,15 @@ Each of "Combined" and "Independent" folders contains:
 * Other relevant input files (e.g. manually annotated lists of interesting proteins).
 * Output files (created by running the R notebooks in the specified order).
 
-## Credits
+### Credits
 * The half-life analysis was done by Estere Seinkmane. 
 * The kinase inference analysis script was written in Python by Dr Tim Stevens.
 * The group leader supporting this work was Dr John S. O'Neill, MRC Laboratory of Molecular Biology.
     
-## VERSION INFORMATION
+### VERSION INFORMATION
 
 R 3.6.3
 
-## LICENSE
+### LICENSE
 
 This code is released with the [MIT License](LICENSE).
