@@ -1,7 +1,5 @@
 # Description
 
-Please see the [referenced publication](https://doi.org/10.1101/2020.05.16.099556) for more details.
-
 These analyses are split into "Independent" and "Combined" analyses, where the dataset is split into genotypes either before or after normalisation, respectively. The independent analysis allows the detection of all the proteins including those that would have been excluded because they are only present in one genotype. Naturally, this means that comparisons of absolute abundance between genotypes. The combined analysis allows this because batch correction occurs before splitting up the data. Therefore the combined analysis was used when comparing expression levels between genotypes, as well as when comparing the relationships between abundance deciles and proportion rhythmic.
 
 Apart from the independent vs combined distinction, the workflow thence is standardised. First is the statistical test for rhythmicity - in this case [RAIN](https://journals.sagepub.com/doi/10.1177/0748730414553029?url_ver=Z39.88-2003&rfr_id=ori:rid:crossref.org&rfr_dat=cr_pub%3dwww.ncbi.nlm.nih.gov) was used. This is followed by calculations of baseline (i.e. mean abundance) and relative amplitudes. Other analyses and code for plotting various types of graphs are included in subsequent notebooks.
