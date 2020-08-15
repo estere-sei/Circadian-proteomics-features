@@ -1,0 +1,114 @@
+---
+title: "Fixing Uniprot IDs"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Combined analysis Notebook 1 - DESCRIPTION
+#
+# We need to select the correct uniprot IDs - i.e. the ones that are reviewed
+# First, we downloaded a list of reviewed proteins from Uniprot, for mus musculus.
+# Then we load the raw data file from Perseus.
+# We extract the uniprot IDs in the proteomics dataset that are present in the reviewed list
+# If no protein is present in the reviewed list then it is NA
+# We also take the opportunity to select the main gene name
+#
+#######################################################################################################################################
+```
+
+```{r}
+#setup
+
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+```
+
+```{r}
+# Downloaded a list of reviewed proteins from uniprot - only columns for Entry, Protein names, Gene names, Length.
+# Downloaded as a tab-separated file
+# Done on 15/08/2020
+# https://www.uniprot.org/uniprot/?query=reviewed%3Ayes+AND+organism%3A%22Mus+musculus+%28Mouse%29+%5B10090%5D%22+AND+proteome%3Aup000000589&sort=genes&desc=no
+# File size (uncompressed) 2MB
+# Rename to reviewed_proteins.tab
+
+reviewed_proteins <- read_tsv("reviewed_proteins.tab")
+
+# read the raw data file, and ensure "NaN" is interpreted as NA
+data_start <- read.delim("CRM3962_6set_MQ1633C_prot_noFil_m8.txt", na = c("NaN"), stringsAsFactors = F)
+data_start <- data_start[-1,] # Remove the first row which is just junk
+data_start[, 1:60] <- sapply(data_start[,1:60], as.numeric) # Make the data numeric - in our case the file is organised like this
+missing_data <- apply(cbind(data_start[,13], data_start[,15]), 1, mean) # Infer values for CKO sample 12 which was missing
+data_start <- cbind(data_start[1:13], missing_data, data_start[15:ncol(data_start)])
+
+# Remove rows which contain NaN within the data columns
+data_start <- data_start[rowSums(is.na(data_start[, 1:60])) == 0,]
+
+# From the proteomics dataset, extract the column for protein IDs
+proteins <- as.vector(data_start$Majority.protein.IDs)
+
+# Create empty vector
+protein_id <- vector("list", length(proteins))
+
+# Create a function that splits protein names arranged in a vector
+split_proteins <- function(data) {
+  list <- strsplit(data, ";")
+  return(list)
+}
+
+# Apply split_proteins to the majority protein names
+protein_id <- lapply(proteins, split_proteins)
+
+# Create empty vector
+correctID <- vector("list", length(protein_id))
+
+# For each element in the separated list, find which one is in the list of reviewed proteins
+# If none are present in the reviewed proteins, return NA
+
+for (i in 1:length(protein_id)) {
+  if(is_empty(which(protein_id[[i]][[1]] %in% reviewed_proteins$Entry))) {
+    correctID[i] <- NA
+  }
+  else {
+    correctID[i] <- protein_id[[i]][[1]][which(protein_id[[i]][[1]] %in% reviewed_proteins$Entry)]
+  }
+}
+
+# Unlist the result + stick it into the original proteomics dataframe
+correctID <- as.data.frame(unlist(correctID))
+data_start$`Corrected uniprot` <- correctID
+
+
+# Now correct gene names
+genes <- as.vector(data_start$Gene.names)
+
+# Create empty vector
+gene_id <- vector("list", length(genes))
+
+# For loop to either print the name or separate them if there are several in one line
+for (i in 1:length(genes)) {
+  gene_id[i] <- strsplit(genes[i], ";")
+}
+
+# Select only the first element on each line --> this is the main protein for each line then attach it to the first column of the total proteome dataframe
+
+gene_id <- unlist(lapply(gene_id, '[', 1))
+data_start$`Corrected genes` <- gene_id
+
+```
+
+
+
+
+
+
+
+
+
+

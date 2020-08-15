@@ -256,5 +256,19 @@ colnames(CKO_data)[1:3] <- c("uniprot", "main_gene", "protein_name")
 
 write.csv(WT_data, "All_WT_normalised_data.csv", row.names = F)
 write.csv(CKO_data, "All_CKO_normalised_data.csv", row.names = F)
+```
+
+
+```{r}
+# For BooteJTK
+
+WT_txt <- cbind(WT_data$main_gene, WT_data[, 4:ncol(WT_data)])
+colnames(WT_txt) <- c("ID", sprintf("CT%s",seq(0,69,3)))
+
+write.table(WT_txt,"All_WT_normalised_data.txt",sep="\t",row.names=F, col.names = F)
+
+
+
+
 
 ```
