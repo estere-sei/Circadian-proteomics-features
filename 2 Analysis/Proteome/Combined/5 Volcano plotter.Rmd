@@ -50,7 +50,55 @@ X = list.files(".",".csv")
 # Read the raw data files
 
 results <- read.csv("CKOvsWT_results.csv", stringsAsFactors=FALSE)
+
+results_bioreps <- read.csv("CKOvsWT_results_bioreps.csv", stringsAsFactors=FALSE)
 ```
+
+```{r}
+# First, plot a volcano to visualise the whole dataset
+
+plt <- EnhancedVolcano(results_bioreps,
+    lab = as.vector(results_bioreps$main_gene),
+    x = 'log_fold_change',
+    y = 'BH_pVal',
+    ylab = bquote(~-Log[10]~italic(q)),
+    axisLabSize = 14,
+    title = NULL, # Title is optional
+    subtitle = NULL,
+    caption = NULL,
+    xlim = c(min(results_bioreps$log_fold_change), max(results_bioreps$log_fold_change)), # Optimise axis limits
+    ylim = c(0, max(-log10(results_bioreps$BH_pVal))),
+    pCutoff = 0.05,
+    FCcutoff = log2(1), # not using a fold-change cutoff here!
+    cutoffLineType = 'blank',
+    cutoffLineCol = 'red',
+    col = c("grey", "grey", "grey", "red"),
+    shape = 20,
+    pointSize = 5,
+    labSize = 4,
+    gridlines.major = FALSE,
+    gridlines.minor = FALSE,
+    legendPosition = "top",
+    legendLabSize = 14,
+    legendIconSize= 8) +
+    theme(panel.border = element_blank(), #make the annoying colour theme go away
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_line(colour = "black"),
+          axis.line = element_line(colour = "black"),
+          axis.ticks.length=unit(0.1, "cm"),
+          axis.text=element_text(colour="black", size = 12), 
+          legend.background = element_blank(),
+          legend.key = element_blank()
+          )
+
+plt
+
+ggsave("volcano_total_proteome_bioreps.pdf", plot = plt, width=5, height = 6)
+
+```
+
 
 ```{r}
 # Import lists of gene names that you are interested in.
