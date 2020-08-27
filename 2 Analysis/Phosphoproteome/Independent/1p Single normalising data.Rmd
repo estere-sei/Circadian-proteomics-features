@@ -313,3 +313,20 @@ write.csv(CKO_phospho_normalised, "CKO_phospho_normalised.csv", row.names = F)
 
 ```
 
+```{r}
+# Prepare .txt files for eJTK
+
+# Separate into WT + CKO with only uniprot IDs
+WTeJTKcomb <- cbind(WT_phospho_normalised$Phosphosite, WT_phospho_normalised[,6:ncol(WT_phospho_normalised)])
+
+CKOeJTKcomb <- cbind(CKO_phospho_normalised$Phosphosite, CKO_phospho_normalised[,6:ncol(CKO_phospho_normalised)])
+
+# Colnames need to be: "#" for IDs, then CT or ZT preceding timepoint number
+colnames(WTeJTKcomb) <- c("ID", paste(rep("CT", 24), seq(0, 69, 3), sep=""))
+colnames(CKOeJTKcomb) <- c("ID", paste(rep("CT", 24), seq(0, 69, 3), sep=""))
+
+# Files need to be tab-separated
+write.table(WTeJTKcomb, file = "WTeJTKcomb-single-p.txt", sep = "\t", row.names = F, col.names = T, quote = F)
+write.table(CKOeJTKcomb, file = "CKOeJTKcomb-single-p.txt", sep = "\t", row.names = F, col.names = T, quote = F)
+
+```

@@ -102,3 +102,89 @@ write.csv(CKO_results, "CKO_RAIN_results.csv", row.names = F)
 
 ```
 
+```{r}
+# Explore how number of rhythmic hits changes as a function of p value cutoff
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+axis_text_size = 12
+axis_label_size = 12
+
+pdist <- function(data) {
+  ggplot(data, aes(x = pVal)) + 
+  geom_histogram(binwidth = 0.01, col = "white") +
+  theme(panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black"),
+        axis.text=element_text(colour="black", size = axis_text_size),
+        axis.title = element_text(colour = "black", size = axis_label_size)) +
+  labs(title = deparse(substitute(data))) +
+  ylab("Count")
+}
+
+p1 <- pdist(WT_results)
+p2 <- pdist(CKO_results)
+
+grid.arrange(p1, p2, nrow = 2)
+```
+
+
+```{r}
+# Try to do BH correction on RAIN p values and then look at distribution
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+axis_text_size = 12
+axis_label_size = 12
+
+WT_results$BH <- p.adjust(WT_results$pVal, method = "BH")
+CKO_results$BH <- p.adjust(CKO_results$pVal, method = "BH")
+
+pdistBH <- function(data) {
+  ggplot(data, aes(x = BH))+ 
+  geom_histogram(col = "white") +
+  theme(panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black"),
+        axis.text=element_text(colour="black", size = axis_text_size),
+        axis.title = element_text(colour = "black", size = axis_label_size)) +
+  labs(title = deparse(substitute(data))) +
+  ylab("Count")
+}
+
+p3 <- pdistBH(WT_results)
+p4 <- pdistBH(CKO_results)
+
+grid.arrange(p1, p3, p2, p4, nrow = 2)
+
+```
+
+```{r}
+# Calculate critical values
+
+WT_results_ordered <- WT_results[order(WT_results$pVal),]
+CKO_results_ordered <- CKO_results[order(CKO_results$pVal),]
+
+pplot <- function(data) {
+  ggplot(data, aes(x=pVal, y=BH)) +
+    geom_line() +
+    xlab("Raw p value") + ylab("BH-corrected p value") +
+    ggtitle("Comparison of p values")
+}
+
+p5 <- pplot(WT_results_ordered)
+p6 <- pplot(CKO_results_ordered)
+
+grid.arrange(p5, p6, nrow = 2)
+
+```

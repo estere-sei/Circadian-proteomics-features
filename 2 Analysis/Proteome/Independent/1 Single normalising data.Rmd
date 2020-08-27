@@ -260,15 +260,18 @@ write.csv(CKO_data, "All_CKO_normalised_data.csv", row.names = F)
 
 
 ```{r}
-# For BooteJTK
+# Prepare .txt files for eJTK
 
-WT_txt <- cbind(WT_data$main_gene, WT_data[, 4:ncol(WT_data)])
-colnames(WT_txt) <- c("ID", sprintf("CT%s",seq(0,69,3)))
+# Separate into WT + CKO with only uniprot IDs
+WTeJTKcomb <- cbind(WT_data$uniprot, dplyr::select(WT_data, contains("WT")))
+CKOeJTKcomb <- cbind(CKO_data$uniprot, CKO_data[,4:ncol(CKO_data)])
 
-write.table(WT_txt,"All_WT_normalised_data.txt",sep="\t",row.names=F, col.names = F)
+# Colnames need to be: "#" for IDs, then CT or ZT preceding timepoint number
+colnames(WTeJTKcomb) <- c("ID", paste(rep("CT", 24), seq(0, 69, 3), sep=""))
+colnames(CKOeJTKcomb) <- c("ID", paste(rep("CT", 24), seq(0, 69, 3), sep=""))
 
-
-
-
+# Files need to be tab-separated
+write.table(WTeJTKcomb, file = "WTeJTKcomb-single.txt", sep = "\t", row.names = F, col.names = T, quote = F)
+write.table(CKOeJTKcomb, file = "CKOeJTKcomb-single.txt", sep = "\t", row.names = F, col.names = T, quote = F)
 
 ```
