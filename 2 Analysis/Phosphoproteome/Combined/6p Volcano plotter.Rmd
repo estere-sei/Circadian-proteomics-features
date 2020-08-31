@@ -5,13 +5,13 @@ output:
 
 ```{r}
 #######################################################################################################################################
-# Combined analysis Notebook 5 - DESCRIPTION
+# Combined analysis Notebook 6 - DESCRIPTION
 #
-# Here we make volcano plots.
+# Here we make a volcano plot to visualise overall changes in phosphorylation.
 # In particular, we highlight proteins of interest by configuring the EnhancedVolcano function.
 # Note that it is able to take some standard ggplot commands.
 # Some of our configurations are not documented by the official documentation - these were discovered by blood, sweat and tears!
-# Dual colours are also possible, but usually they look too busy. Connecting lines also make it too busy.
+# 
 #
 # INPUTS = results of mutliple t tests with BH correction (.csv)
 # OUTPUTS = volcano plots (.pdf)
@@ -95,153 +95,5 @@ plt <- EnhancedVolcano(results,
 plt
 
 ggsave("volcano_total_phospho.pdf", plot = plt, width=8, height = 9)
-
-```
-
-
-```{r}
-# Import lists of gene names that you are interested in.
-# These are created manually by going through the dataset and creating .csv files of your lists.
-# Yes there are different importing methods - various reasons meant this was necessary to correctly read them.
-
-proteasomes <- readLines("proteasome_core.csv") 
-
-ribosomes <- readLines("ribosome.csv") 
-
-PQC1 <- read.csv("PQC1.csv", stringsAsFactors = F, header = F)
-PQC1 <- PQC1$V1
-
-transport <- readLines("ion_transport.csv")
-
-rts <- read.csv("responsetostress.csv", stringsAsFactors = F, header = F)
-rts <- rts$V1
-
-atp <- read.csv("ATP_transport.csv", stringsAsFactors = F, header = F)
-atp <- atp$V1
-
-ribosynth <- read.csv("ribosome_biogenesis.csv", stringsAsFactors = F, header = F)
-ribosynth <- ribosynth$V1
-
-gly <- read.csv("gly.csv", stringsAsFactors = F, header = F)
-gly <- gly$V1
-
-ox <- read.csv("ox.csv", stringsAsFactors = F, header = F)
-ox <- ox$V1
-
-kinases <- read.csv("kinases.csv", stringsAsFactors = F, header = F)
-kinases <- kinases$V1
-
-phosphatases <- read.csv("phosphatases.csv", stringsAsFactors = F, header = F)
-phosphatases <- phosphatases$V1
-
-```
-
-```{r}
-#######################################################################################################################################
-# Creating a magnificent function for a single-colour volcano plot
-#######################################################################################################################################
-
-plt_volcano <- function(data, highlights) {
-  # Reorder results with important ones first
-  interest <- subset(data, data$main_gene %in% c(highlights))
-  not_highlights <- subset(data, !(data$main_gene %in% c(highlights)))
-  input <- rbind(not_highlights, interest)
-  
-  # Now make a named list to use as your instructions for plotting options
-  keyvals.PQC <- rep('gray', nrow(input))
-  names(keyvals.PQC) <- rep('Other', nrow(input))
-  
-  # Modify the set to highlight the ones you're interested in
-  names(keyvals.PQC)[which(input$main_gene %in% highlights)] <- 'Highlights'
-  keyvals.PQC[which(input$main_gene %in% highlights)] <- 'red'
-  
-  pd <- EnhancedVolcano(input,
-    lab = as.vector(input$main_gene),
-    selectLab = c(highlights), # This is to label only the ones you want
-    x = 'log_fold_change',
-    y = 'BH_pVal',
-    ylab = bquote(~-Log[10]~italic(q)),
-    axisLabSize = 14,
-    title = NULL, # Title is optional
-    subtitle = NULL,
-    caption = NULL,
-    xlim = c(min(input$log_fold_change), max(input$log_fold_change)), # Optimise laxis limits
-    ylim = c(0, 50),
-    pCutoff = 0.05,
-    FCcutoff = log2(1), # not using a fold-change cutoff here!
-    cutoffLineType = 'blank',
-    cutoffLineCol = 'red',
-    shape = 20,
-    pointSize = c(ifelse(keyvals.PQC == 'gray', 4, 5)),
-    labSize = 4,
-    colCustom = keyvals.PQC,
-    colAlpha = c(ifelse(keyvals.PQC == 'gray', 0.3, 1)),
-    gridlines.major = FALSE,
-    gridlines.minor = FALSE,
-    legendPosition = "top",
-    legendLabSize = 14,
-    legendIconSize= 8) +
-    theme(panel.border = element_blank(), #make the annoying colour theme go away
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.background = element_blank(),
-          axis.ticks = element_line(colour = "black"),
-          axis.line = element_line(colour = "black"),
-          axis.ticks.length=unit(0.1, "cm"),
-          axis.text=element_text(colour="black", size = 12), 
-          legend.background = element_blank(),
-          legend.key = element_blank()
-          )
-  pd
-}
-```
-
-```{r}
-# Do your plotting and export
-
-# RESPONSE TO STRESS
-plt <- plt_volcano(results, rts)
-ggsave("volcano_RTS.pdf", plot = plt, width=5, height = 6)
-
-# GLYCOLYSIS
-plt <- plt_volcano(results, gly)
-ggsave("volcano_gly.pdf", plot = plt, width=5, height = 6)
-
-# OXPHOS
-plt <- plt_volcano(results, ox)
-ggsave("volcano_ox.pdf", plot = plt, width=5, height = 6)
-
-# ATP
-plt <- plt_volcano(results, atp)
-ggsave("volcano_ATP.pdf", plot = plt, width=5, height = 6)
-
-# Ribosome subunits
-plt <- plt_volcano(results, ribosomes)
-ggsave("volcano_ribo.pdf", plot = plt, width=5, height = 6)
-
-# Ribosome biogenesis
-plt <- plt_volcano(results, ribosynth)
-ggsave("volcano_ribosynth.pdf", plot = plt, width=5, height = 6)
-
-# Ion transport
-plt <- plt_volcano(results, transport)
-ggsave("volcano_ions.pdf", plot = plt, width=5, height = 6)
-
-# Proteasomes
-plt <- plt_volcano(results, proteasomes)
-ggsave("volcano_proteasome.pdf", plot = plt, width=5, height = 6)
-
-# PQC
-plt <- plt_volcano(results, PQC1)
-ggsave("volcano_PQC1.pdf", plot = plt, width=5, height = 6)
-
-# Protein kinases
-plt <- plt_volcano(results, kinases)
-ggsave("volcano_kinases.pdf", plot = plt, width=5, height = 6)
-
-# Protein phosphatases
-plt <- plt_volcano(results, phosphatases)
-ggsave("volcano_phosphatases.pdf", plot = plt, width=5, height = 6)
-
 
 ```
