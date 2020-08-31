@@ -49,16 +49,15 @@ X = list.files(".",".csv")
 
 # Read the raw data files
 
-results <- read.csv("CKOvsWT_results.csv", stringsAsFactors=FALSE)
+results <- read.csv("CKOvsWT_results_phospho.csv", stringsAsFactors=FALSE)
 
-results_bioreps <- read.csv("CKOvsWT_results_bioreps.csv", stringsAsFactors=FALSE)
 ```
 
 ```{r}
 # First, plot a volcano to visualise the whole dataset
 
 plt <- EnhancedVolcano(results,
-    lab = as.vector(results$main_gene),
+    lab = as.vector(results$gene_names),
     x = 'log_fold_change',
     y = 'BH_pVal',
     ylab = bquote(~-Log[10]~italic(q)),
@@ -95,7 +94,7 @@ plt <- EnhancedVolcano(results,
 
 plt
 
-ggsave("volcano_total_proteome.pdf", plot = plt, width=8, height = 9)
+ggsave("volcano_total_phospho.pdf", plot = plt, width=8, height = 9)
 
 ```
 
