@@ -72,14 +72,15 @@ plt <- EnhancedVolcano(results,
     cutoffLineType = 'blank',
     cutoffLineCol = 'red',
     col = c("grey", "grey", "grey", "red"),
-    shape = 20,
-    pointSize = 5,
-    labSize = 4,
+    shape = 16,
+    pointSize = 4,
+    labSize = 5,
     gridlines.major = FALSE,
     gridlines.minor = FALSE,
     legendPosition = "top",
     legendLabSize = 14,
-    legendIconSize= 8) +
+    legendLabels=c(NA,'q>0.05', NA, 'q<=0.05'),
+    legendIconSize= 5) +
     theme(panel.border = element_blank(), #make the annoying colour theme go away
           panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(),
@@ -87,7 +88,7 @@ plt <- EnhancedVolcano(results,
           axis.ticks = element_line(colour = "black"),
           axis.line = element_line(colour = "black"),
           axis.ticks.length=unit(0.1, "cm"),
-          axis.text=element_text(colour="black", size = 12), 
+          axis.text=element_text(colour="black", size = 12, family = "sans"), 
           legend.background = element_blank(),
           legend.key = element_blank()
           )

@@ -88,3 +88,15 @@ ordered_results <- results %>% arrange(BH_pVal)
 write.csv(ordered_results, "CKOvsWT_results_phospho.csv", row.names = F)
 
 ```
+
+```{r}
+# Calculating average change, but absolute values
+
+sigresults = results[results$BH_pVal <= 0.05, ]
+
+logmean = mean(abs(sigresults$log_fold_change))
+mea = 2^logmean # 1.209 = 21%
+med = median(abs(sigresults$fold_change - 1)) # 0.151 = 15%
+  
+```
+
