@@ -51,7 +51,6 @@ X = list.files(".",".csv")
 
 results <- read.csv("CKOvsWT_results.csv", stringsAsFactors=FALSE)
 
-results_bioreps <- read.csv("CKOvsWT_results_bioreps.csv", stringsAsFactors=FALSE)
 ```
 
 ```{r}
@@ -106,35 +105,8 @@ ggsave("volcano_total_proteome.pdf", plot = plt, width=8, height = 9)
 # These are created manually by going through the dataset and creating .csv files of your lists.
 # Yes there are different importing methods - various reasons meant this was necessary to correctly read them.
 
-proteasomes <- readLines("proteasome_core.csv") 
-
-ribosomes <- readLines("ribosome.csv") 
-
-PQC1 <- read.csv("PQC1.csv", stringsAsFactors = F, header = F)
-PQC1 <- PQC1$V1
-
-transport <- readLines("ion_transport.csv")
-
 rts <- read.csv("responsetostress.csv", stringsAsFactors = F, header = F)
 rts <- rts$V1
-
-atp <- read.csv("ATP_transport.csv", stringsAsFactors = F, header = F)
-atp <- atp$V1
-
-ribosynth <- read.csv("ribosome_biogenesis.csv", stringsAsFactors = F, header = F)
-ribosynth <- ribosynth$V1
-
-gly <- read.csv("gly.csv", stringsAsFactors = F, header = F)
-gly <- gly$V1
-
-ox <- read.csv("ox.csv", stringsAsFactors = F, header = F)
-ox <- ox$V1
-
-kinases <- read.csv("kinases.csv", stringsAsFactors = F, header = F)
-kinases <- kinases$V1
-
-phosphatases <- read.csv("phosphatases.csv", stringsAsFactors = F, header = F)
-phosphatases <- phosphatases$V1
 
 ```
 
@@ -204,46 +176,6 @@ plt_volcano <- function(data, highlights) {
 # RESPONSE TO STRESS
 plt <- plt_volcano(results, rts)
 ggsave("volcano_RTS.pdf", plot = plt, width=5, height = 6)
-
-# GLYCOLYSIS
-plt <- plt_volcano(results, gly)
-ggsave("volcano_gly.pdf", plot = plt, width=5, height = 6)
-
-# OXPHOS
-plt <- plt_volcano(results, ox)
-ggsave("volcano_ox.pdf", plot = plt, width=5, height = 6)
-
-# ATP
-plt <- plt_volcano(results, atp)
-ggsave("volcano_ATP.pdf", plot = plt, width=5, height = 6)
-
-# Ribosome subunits
-plt <- plt_volcano(results, ribosomes)
-ggsave("volcano_ribo.pdf", plot = plt, width=5, height = 6)
-
-# Ribosome biogenesis
-plt <- plt_volcano(results, ribosynth)
-ggsave("volcano_ribosynth.pdf", plot = plt, width=5, height = 6)
-
-# Ion transport
-plt <- plt_volcano(results, transport)
-ggsave("volcano_ions.pdf", plot = plt, width=5, height = 6)
-
-# Proteasomes
-plt <- plt_volcano(results, proteasomes)
-ggsave("volcano_proteasome.pdf", plot = plt, width=5, height = 6)
-
-# PQC
-plt <- plt_volcano(results, PQC1)
-ggsave("volcano_PQC1.pdf", plot = plt, width=5, height = 6)
-
-# Protein kinases
-plt <- plt_volcano(results, kinases)
-ggsave("volcano_kinases.pdf", plot = plt, width=5, height = 6)
-
-# Protein phosphatases
-plt <- plt_volcano(results, phosphatases)
-ggsave("volcano_phosphatases.pdf", plot = plt, width=5, height = 6)
 
 
 ```

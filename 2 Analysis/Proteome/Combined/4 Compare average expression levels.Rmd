@@ -106,41 +106,6 @@ write.csv(ordered_results, "CKOvsWT_results.csv", row.names = F)
 ```
 
 ```{r}
-# Alternative method: Use each day as a biological replicate
-
-# Calculate the means for each day for each genotype
-WT_rep1 <- apply(select(WT_data, contains("WT1")), 1, mean)
-WT_rep2 <- apply(select(WT_data, contains("WT2")), 1, mean)
-WT_rep3 <- apply(select(WT_data, contains("WT3")), 1, mean)
-
-CKO_rep1 <- apply(select(CKO_data, contains("KO1")), 1, mean)
-CKO_rep2 <- apply(select(CKO_data, contains(c("KO2", "missing_data"))), 1, mean)
-CKO_rep3 <- apply(select(CKO_data, contains("KO3")), 1, mean)
-
-# Combine the daily means
-WT_reps <- cbind(WT_rep1, WT_rep2, WT_rep3)
-CKO_reps <- cbind(CKO_rep1, CKO_rep2, CKO_rep3)
-
-# T test of daily means - do log10 of them first
-test_input <- log10(cbind(WT_reps, CKO_reps))
-t_test_output <- apply(test_input, 1, function(x) t.test(x[1:3], x[4:6])$p.value)
-BH_adjusted_p <- p.adjust(t_test_output, "BH")
-
-# Calculate fold changes
-WT_averages <- apply(WT_reps, 1, mean)
-CKO_averages <- apply(CKO_reps, 1, mean)
-fold_changes <- CKO_averages / WT_averages
-log_fold_changes <- log2(fold_changes)
-
-# Combine into results dataframe and export
-results <- cbind(master_list[,1:3], main_gene, t_test_output, BH_adjusted_p, fold_changes, log_fold_changes)
-colnames(results) <- c("Uniprot_ID","protein_names", "gene_names", "main_gene", "pVal", "BH_pVal", "fold_change", "log_fold_change")
-ordered_results <- results %>% arrange(BH_pVal)
-write.csv(ordered_results, "CKOvsWT_results_bioreps.csv", row.names = F)
-
-```
-
-```{r}
 # Calculating average change, but absolute values
 
 sigresults = results[results$BH_pVal <= 0.05, ]
