@@ -36,7 +36,7 @@ Each of "Combined" and "Independent" folders contains:
     
 ### VERSION INFORMATION
 
-R 3.6.3
+R 4.0.3
 
 ### LICENSE
 
