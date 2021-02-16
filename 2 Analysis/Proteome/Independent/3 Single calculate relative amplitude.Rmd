@@ -171,7 +171,7 @@ write.csv(CKO_export, "CKO_RA_B.csv", row.names = F)
 WT_all <- read.csv("WT_RAIN_results.csv", stringsAsFactors = F)
 CKO_all <- read.csv("CKO_RAIN_results.csv", stringsAsFactors = F)
 
-#calculate baseline (=average abundance in all timepoints) - be careful which columns contain teh actual timepoint data
+#calculate baseline (=average abundance in all timepoints) - be careful which columns contain the actual timepoint data
 WT_all$Baseline <- rowMeans(WT_all[,8:31])
 CKO_all$Baseline <- rowMeans(CKO_all[,8:31])
 
