@@ -1,0 +1,60 @@
+---
+title: "Calculating min-max fold-change in abundance between genotypes "
+output:
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 2 - DESCRIPTION
+#
+# Here we take all normalised abundance data and calculate the fold-change between maximum and minimum values.
+
+#
+# INPUTS = all normalised data (.csv)
+# OUTPUTS = min-max fold changes between WT and CKO
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+X
+
+# read the normalised data files
+data_start<- read.csv("All_normalised_data.csv")
+```
+
+```{r}
+# Calculate fold changes by max/min- mean of replicates
+means<- data_start %>% select(uniprot)
+
+#average replicates and calculate fold changes with the averages
+means$WT_T24<- apply(data_start[,4:7], 1, mean)
+means$WT_T36<- apply(data_start[,8:11], 1, mean)
+means$CKO_T24<- apply(data_start[,12:15], 1, mean)
+means$CKO_T36<- apply(data_start[,16:19], 1, mean)
+```
+
+```{r}
+#calculate min-max fold changes between CKO and WT
+
+means$WT_mean<- apply(data_start[,4:11], 1, mean)
+means$CKO_mean<- apply(data_start[,12:19], 1, mean)
+means$WT_CKO_FC<- apply(means[, 6:7], 1, function(x){max(x)/min(x)})
+
+write.csv(means, "WTvsCKO_min_max_fold_changes.csv", row.names = F)
+```
+

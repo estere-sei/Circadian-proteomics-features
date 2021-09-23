@@ -1,0 +1,77 @@
+---
+title: "Venn diagrams"
+output: 
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 6- DESCRIPTION
+# Here we take significant proteins that change over time, as calculated in Prism, and plot Venn diagrams of overlap
+#
+# INPUTS = All_normalised_data (.csv), JON_analysis (.csv)
+# OUTPUTS = Venn diagrams
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("VennDiagram")) {
+  install.packages("VennDiagram", dependencies = TRUE)
+  library(VennDiagram)
+} 
+
+
+# Make a list of all the .csv and .txt files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+X
+```
+
+```{r}
+data<- read.csv("All_normalised_data.csv", stringsAsFactors = F)
+values<-read.csv("JON_analysis.csv", stringsAsFactors = F)
+```
+
+
+```{r}
+#pairwise venn diagram 
+venn.plot<- draw.pairwise.venn(area1 = nrow(subset(values, WT_p_value<= 0.05)), 
+                 area2 = nrow(subset(values, CKO_p_value<= 0.05)), 
+                 cross.area = nrow(subset(values, WT_p_value <= 0.05 & CKO_p_value <= 0.05)), 
+                 euler.d = TRUE, 
+                 scaled = TRUE,
+                 category = c("WT vs time", "CKO vs time"), 
+                 lty = "blank", 
+                 fill = c("black", "red"),
+                 fontfamily ="sans",
+                 fontface = "bold",
+                 cat.fontfamily = "sans",
+                 cat.fontface = "bold",
+                 cex = rel(2),
+                 cat.cex = rel(2),
+                 margin = 0.2,
+                 cat.dist = c(0.3, 0.3),
+                 cat.prompts = TRUE, 
+                 rotation.degree = 90,
+                 cat.pos = c(0, 180),
+                 label.col= "white"
+                                )
+
+
+pdf("Venn_WT_CKO_time.pdf")
+
+grid.draw(venn.plot)
+
+dev.off()
+```
+

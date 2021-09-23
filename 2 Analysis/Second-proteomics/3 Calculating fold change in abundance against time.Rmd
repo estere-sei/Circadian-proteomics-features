@@ -1,0 +1,132 @@
+---
+title: "3 Calculating fold change in abundance against time"
+output:
+---
+
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 3- DESCRIPTION
+# Here we take all normalised abundance data and calculate the fold-change between maximum and minimum values, for each individual sample.
+# We go on to plot probability density, and apply Levene's test to test for homogeneity of variance between samples. 
+#
+# INPUTS = all normalised data (.csv)
+# OUTPUTS = probability density plots, Levene's test for homogeneity of variance, min-max fold changes of each genotype against time
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+
+if (!require("car")) {
+  install.packages("car", dependencies = TRUE)
+  library(car)
+}
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+X
+
+# read the normalised data files
+
+data_start<- read.csv("All_normalised_data.csv")
+
+
+```
+
+```{r}
+#calculating min-max fold changes
+WT1<- cbind(data_start$wt_1_t24, data_start$wt_1_t36)
+WT2<- cbind(data_start$wt_2_t24, data_start$wt_2_t36)
+WT3<- cbind(data_start$wt_3_t24, data_start$wt_3_t36)
+WT4<- cbind(data_start$wt_4_t24, data_start$wt_4_t36)
+CKO1<- cbind(data_start$ko_1_t24, data_start$ko_1_t36)
+CKO2<- cbind(data_start$ko_2_t24, data_start$ko_2_t36)
+CKO3<- cbind(data_start$ko_3_t24, data_start$ko_3_t36)
+CKO4<- cbind(data_start$ko_4_t24, data_start$ko_4_t36)
+
+FC<- data_start %>%
+  select(uniprot:gene_names)
+
+FC$wt_1<- apply(WT1, 1, function(x){max(x)/min(x)})
+FC$wt_2<- apply(WT2, 1, function(x){max(x)/min(x)})
+FC$wt_3<- apply(WT3, 1, function(x){max(x)/min(x)})
+FC$wt_4<- apply(WT4, 1, function(x){max(x)/min(x)})
+FC$cko_1<- apply(CKO1, 1, function(x){max(x)/min(x)})
+FC$cko_2<- apply(CKO2, 1, function(x){max(x)/min(x)})
+FC$cko_3<- apply(CKO3, 1, function(x){max(x)/min(x)})
+FC$cko_4<- apply(CKO4, 1, function(x){max(x)/min(x)})
+
+write.csv(FC, "min_max_fold_changes.csv", row.names = FALSE)
+```
+
+```{r}
+#plotting probability densities
+
+FC2<- FC %>%
+  select(uniprot, wt_1:cko_4)%>%
+  gather(sample, FC, -uniprot) %>%
+  mutate(genotype = if_else(str_detect(sample, "wt"), "WT", "CKO"))
+
+pd_indiv <- ggplot(data= FC2, aes(x=FC, fill=sample)) +
+  geom_density(alpha=0.5)+
+  xlim(1, 1.3) +
+  labs(y="Probability density", x="Fold Change") +
+  theme(panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_line(colour = "black", size=1),
+        axis.line = element_line(colour = "black", size=1),
+        axis.text=element_text(colour="black", face="bold", size=11),
+        axis.title.x = element_text(colour= "black", face="bold", size=12),
+        axis.title.y = element_text(colour= "black", face="bold", size=12),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        legend.text = element_text(colour="black", face="bold", size=11),
+        legend.title = element_blank()) +
+  facet_wrap(~genotype, nrow=2)+
+  theme(strip.text.x = element_text(size = 14, face = "bold"),
+        strip.background =element_rect(fill="white"))
+
+pd_indiv
+
+ggsave("Min_max_fold_change_prob_densities_individual.pdf", width = 7, height =5)
+```
+
+```{r}
+#Levene's test to test homogeneity of variance 
+FC2_var<- FC2 %>%
+  group_by(genotype, sample) %>%
+  summarise(var= var(FC),
+            median= median(FC))
+
+var.test(var ~ genotype, FC2_var, 
+         alternative = "two.sided")
+
+
+levenetest_WT <- leveneTest(FC ~ sample, data = WT, center=median)
+levenetest_WT #p= 2.589e-05
+
+levenetest_CKO <- leveneTest(FC ~ sample, data = CKO, center = median)
+levenetest_CKO #p< 2.2e-16
+
+
+```
+

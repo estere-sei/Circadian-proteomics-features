@@ -1,0 +1,114 @@
+---
+title: "Plot probability densities"
+output: 
+---
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 5- DESCRIPTION
+# Here we take calculated fold changes and plot probability densities. 
+# We use Kruskal-Wallis tests with Dunnett's post hoc tests to test for differences in variation 
+#
+# INPUTS = min_max_fold_changes (.csv), WTvsCKO_min_max_fold_changes (.csv)
+# OUTPUTS = probability density plots, Kruskal-Wallis tests
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+if (!require("DescTools")) {
+ install.packages("DescTools", dependencies = TRUE)
+  library(DescTools)
+}
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+X
+
+# read the normalised data files
+
+data_start<- read.csv("All_normalised_data.csv")
+```
+
+```{r}
+#import calculated min-max fold changes over time
+FC_time<- read.csv("min_max_fold_changes.csv", stringsAsFactors = F)
+
+WT_time<- apply(FC_time[,4:7], 1, mean)
+CKO_time<- apply(FC_time[,8:11], 1, mean)
+
+WT_CKO<- read.csv("WTvsCKO_min_max_fold_changes.csv", stringsAsFactors = F)
+
+all_groups<- cbind(WT_time, CKO_time, WT_CKO$WT_CKO_FC)
+all_groups<- as.data.frame(all_groups)
+colnames(all_groups)[3]<- "WT_CKO"
+
+median(all_groups$WT_time)
+median(all_groups$CKO_time)
+median(all_groups$WT_CKO)
+
+```
+
+
+```{r}
+#Kruskal-Wallis test with Dunnett's post hoc test 
+
+all_groups2<- all_groups %>%
+  gather(group, FC)
+
+#Dunn post hoc test 
+all_groups2$FC <- as.numeric(all_groups2$FC)
+all_groups2$group <- as.factor(all_groups2$group)
+
+dt2<- DunnettTest(FC~group, data= all_groups2,control="WT_time")
+dt2                 
+```
+
+
+```{r}
+colours <- c("WT vs time" = "black", "CKO vs time" = "red", "WT vs CKO" = "blue")
+
+
+pd<- ggplot() +
+  geom_density(aes(x=WT_time, colour = "WT vs time"), data = all_groups, size = 0.3) +
+  geom_density(aes(x=CKO_time, colour = "CKO vs time"), data = all_groups, size = 0.3) +
+  geom_density(aes(x=WT_CKO, colour= "WT vs CKO"), data= all_groups, size =0.3)+
+  scale_colour_manual(name = "", values = colours) +
+  xlim(1, 1.5) +
+  labs(y="Probability density", x="Absolute Fold Change") +
+  theme(panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_line(colour = "black", size=1),
+        axis.line = element_line(colour = "black", size=1),
+        axis.text=element_text(colour="black", face="bold", size=16),
+        axis.title.x = element_text(colour= "black", face="bold", size=18),
+        axis.title.y = element_text(colour= "black", face="bold", size=18),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        legend.text = element_text(colour="black", face="bold", size=16),
+        legend.title = element_blank(),
+        strip.text.x = element_text(size = 14, face = "bold"),
+        strip.background =element_rect(fill="white"))
+
+pd
+
+ggsave("prob_density_wt_cko_time_wtcko.pdf", height = 5, width = 8)
+```
+

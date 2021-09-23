@@ -1,0 +1,87 @@
+---
+title: "Fold changes male v female"
+output: 
+---
+```{r}
+#######################################################################################################################################
+# Independent analysis Notebook 4- DESCRIPTION
+# Here we take all normalised abundance data and calculate the fold-change between maximum and minimum values, for WT male vs female
+#
+# INPUTS = all normalised data (.csv)
+# OUTPUTS = min-max fold changes WT male vs female
+# 
+#######################################################################################################################################
+```
+
+```{r}
+# Setup
+# Clear your workspace
+rm(list=ls())
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+
+# Make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+X
+
+# read the normalised data files
+
+data_start<- read.csv("All_normalised_data.csv")
+```
+
+```{r}
+sample<- c("wt_1", "wt_2", "wt_3", "wt_4", "cko_1", "cko_2", "cko_3", "cko_4")
+sex<- c("F", "M", "M", "F", "M", "F", "F", "F")
+
+sexes<- cbind(sample, sex)
+write.csv(sexes, "Sexes.csv", row.names = F)
+
+female<- data_start %>%
+  select(wt_1_t24, wt_4_t24, wt_1_t36, wt_4_t36, ko_2_t24:ko_4_t24, ko_2_t36:ko_4_t36)
+
+male<- data_start %>%
+  select(wt_2_t24, wt_3_t24, wt_2_t36, wt_3_t36, ko_1_t24, ko_1_t36)
+
+```
+
+```{r}
+female_mean<- apply(female, 1, mean)
+male_mean<- apply(male, 1, mean)
+
+mean<- cbind(female_mean, male_mean)
+mean<- as.data.frame(mean)
+
+mean$FC<- apply(mean, 1, function(x){max(x)/min(x)})
+```
+
+
+```{r}
+#WT only 
+
+WT_female<- female %>%
+  select(wt_1_t24:wt_4_t36)
+
+WT_male<- male %>%
+  select(wt_2_t24:wt_3_t36)
+
+WT_female_mean<- apply(WT_female, 1, mean)
+WT_male_mean<- apply(WT_male, 1, mean)
+
+WT_mean<- cbind(WT_female_mean, WT_male_mean)
+WT_mean<- as.data.frame(WT_mean)
+
+WT_mean$FC<- apply(WT_mean, 1, function(x){max(x)/min(x)})
+
+write.csv(WT_mean, "WT_male_vs_female_fold_changes.csv", row.names = F)
+```
+
+
