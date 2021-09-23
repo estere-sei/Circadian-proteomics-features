@@ -1,0 +1,152 @@
+---
+title: "Sample loading normalisation + IRS"
+output:
+---
+
+```{r}
+#######################################################################################################################################
+# Combined analysis Notebook 1 - DESCRIPTION
+#
+# Here we take the raw data (output of Perseus without NA-filtering).
+# We apply sample loading normalisation to correct for small errors in pipetting - this assumes equal protein was used for
+# all samples submitted for TMT labelling.
+
+# Along the way we plot the data to make sure that we can spot obvious mistakes.
+# Finally, we export the data because this is handy for plotting proteins of interest in other software!
+#
+# INPUTS = raw data from Perseus (.txt)
+# OUTPUTS = normalised data for further analysis (.csv)
+#
+#######################################################################################################################################
+```
+
+```{r}
+#setup
+
+# Clear your workspace
+rm(list=ls())
+
+# Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+if (!require("BiocManager")) {
+  install.packages("BiocManager", dependencies = TRUE)
+}
+
+if (!require("edgeR")) {
+  BiocManager::install("edgeR")
+  library(edgeR)
+}
+
+if (!require("psych")) {
+  install.packages("psych", dependencies = TRUE)
+  library(psych)
+} 
+
+# read the raw data file, and ensure "NaN" is interpreted as NA
+data_start <- read.delim("CRM5737_TMT16_QE_prot_m7.txt", na = c("NaN"), stringsAsFactors = F)
+data_start <- data_start[-1,] # Remove the first row which is just junk
+data_start[, 1:16] <- sapply(data_start[,1:16], as.numeric) # Make the data numeric - in our case the file is organised like this
+
+# Remove rows which contain NaN within the data columns
+data_start <- data_start[rowSums(is.na(data_start[, 1:16])) == 0,]
+```
+
+```{r}
+# Clean up majority protein IDs
+# First, extract the important column
+proteins <- as.vector(data_start$Majority.protein.IDs)
+proteins<-gsub("\\-.*","",proteins)
+
+# Create empty vector
+protein_id <- vector("list", length(proteins))
+
+# For loop to either print the name or separate them if there are several in one line
+for (i in 1:length(proteins)) {
+  protein_id[i] <- strsplit(proteins[i], ";")
+}
+
+# Select only the first element on each line --> this is the main protein for each line then attach it to the first column of the total proteome dataframe
+
+protein_ids <- unlist(lapply(protein_id, '[[', 1))
+data_start$uniprot <- protein_ids
+```
+
+```{r}
+#Create name lists
+uniprot = as.list(data_start$uniprot)
+uniprot <- unlist(uniprot)
+protein_names = as.list(data_start[,29])
+protein_names <- unlist(protein_names)
+gene_names = as.list(data_start[,30])
+gene_names <- unlist(gene_names)
+
+# Extract data only - in our case this is how the data was organised in the txt file
+data_raw<- as.data.frame(data_start[1:16])
+
+WT_data_raw<- as.data.frame(data_start[1:8])
+CKO_data_raw <- as.data.frame(data_start[9:16])
+```
+
+```{r}
+#See what raw data looks like 
+
+boxplot(log2(WT_data_raw), 
+        main = "WT Raw data",
+        xlab = 'TMT Sample', ylab = 'log2 of Intensity', notch = TRUE)
+
+boxplot(log2(CKO_data_raw), 
+        main = "CKO Raw data",
+        xlab = 'TMT Sample', ylab = 'log2 of Intensity', notch = TRUE)
+
+# can also look at density plots (like a distribution histogram)
+plotDensities(log2(WT_data_raw), 6, 
+              main = 'WT Raw data')
+
+plotDensities(log2(CKO_data_raw), 6, 
+              main = 'CKO Raw data')
+
+# check the column totals (per channel sums)
+format(round(colSums(WT_data_raw), digits = 0), big.mark = ",")
+format(round(colSums(CKO_data_raw), digits = 0), big.mark = ",")
+
+# see how things cluster
+plotMDS(log2(data_raw), 
+        main = "SL/TMM clusters group by TMT experiment")
+```
+
+```{r}
+#Sample loading normalisation
+
+target <- mean(colSums(data_raw))
+norm_facs<- target/colSums(data_raw)
+data_sl<- sweep(data_raw, 2, norm_facs, FUN = "*")
+
+# see what the SL normalised data look like
+boxplot(log2(data_sl), 
+        main = "Sample loading (SL)",
+        xlab = 'TMT Sample', ylab = 'log2 of Intensity', notch = TRUE)
+
+# can also look at density plots (like a distribution histogram)    
+plotDensities(log2(data_sl), main = "SL data")
+
+# check the columnn totals
+format(round(colSums(data_sl), digits = 0), big.mark = ",")
+```
+
+```{r}
+# see how things cluster now that we have nice boxplots and density plots
+plotMDS(log2(data_sl), 
+        main = "SL/TMM clusters group by TMT experiment")
+```
+
+```{r}
+# Combine uniprot ID, protein names, gene names, normalised data
+master_list <- cbind(uniprot, protein_names, gene_names, data_sl)
+
+write.csv(master_list, "All_normalised_data.csv", row.names = F)
+```
+
