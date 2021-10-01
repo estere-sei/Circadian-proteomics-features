@@ -5,6 +5,8 @@ Custom analysis of in vitro circadian timecourse proteomics and phosphoproteomic
 ### VERSION INFORMATION
 
 R 4.0.3
+(R 4.1.1 was used for the new validation experiment)
+
 ### LICENSE
 
 This code is released with the [MIT License](LICENSE).
