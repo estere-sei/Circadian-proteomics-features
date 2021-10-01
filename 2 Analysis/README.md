@@ -29,7 +29,10 @@ Each of "Combined" and "Independent" folders contains:
 
 "empirical-JTK_CYCLE-with-asymmetry" is a clone of the [eJTK github repository](https://github.com/alanlhutchison/empirical-JTK_CYCLE-with-asymmetry) written by Alan Hutchinson, with my own input data files for analysis.
 
+"Second-proteomics" contains all the analysis files for the new validation proteomics experiment, as carried out by Aiwei Zeng.
+
 ### Credits
+* The new validation proteomics experiment in "Second-proteomics" was performed and analysed by Aiwei Zeng.
 * The half-life analysis was done by Estere Seinkmane. 
 * The kinase inference analysis script was written in Python by Dr Tim Stevens.
 * The group leader supporting this work was Dr John S. O'Neill, MRC Laboratory of Molecular Biology.
@@ -37,6 +40,8 @@ Each of "Combined" and "Independent" folders contains:
 ### VERSION INFORMATION
 
 R 4.0.3
+
+(R 4.1.1 was used in "Second-proteomics")
 
 ### LICENSE
 
