@@ -1,0 +1,224 @@
+---
+title: "Half-life vs rhythmicity? DRAFTS"
+subtitle: "Taking half-life data from an external dataset (McShane et al 2016, in 3t3 fibroblasts), to compare to presence/absence of rhythmicity & relative amplitude"
+output: html_notebook
+---
+
+```{r}
+#setup
+#clear your workspace
+rm(list=ls())
+
+#Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("ggplot2")) {
+  install.packages("ggplot2", dependencies = TRUE)
+  library(ggplot2)
+}
+
+if (!require("plyr")) {
+  install.packages("plyr", dependencies = TRUE)
+  library(plyr)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+#read the RAIN files from independent analysis, with correct primary IDs
+WT_data <- read.csv("WT RAIN corrected ID.csv", stringsAsFactors = F)
+CKO_data <- read.csv("CKO RAIN corrected ID.csv", stringsAsFactors = F)
+
+
+
+#rhythmic lists with relative amplitude from independent analysis 
+WT_rhy_RAcutoff <- read.csv("rhythmic WT corrected ID.csv", stringsAsFactors = F)
+CKO_rhy_RAcutoff <- read.csv("rhythmic CKO corrected ID.csv", stringsAsFactors = F)
+
+
+```
+
+
+
+```{r}
+#read in the half-life data - in this case from McShane et al Cell 2016, done in NIH 3T3 with AHA
+prot_stab <- read.csv("McShane et al prot stability 3t3.csv", stringsAsFactors = F)
+
+prot_stab
+
+#they have 2 degradation profiles (exponential and non-exponential), so separate based on that and select half life
+prot_ned <- subset(prot_stab, prot_stab$Degradation.profile == "NED")
+prot_ed <- subset(prot_stab, !(prot_stab$Degradation.profile == "NED"))
+
+cn <- c("Uniprot_ID", "Half_life", "Deg profile")
+
+#pick the one-phase decay half-life value for ED proteins, and 2-phase for NED - how they describe in the paper
+prot_ned_s <- prot_ned[,c(1,39,41)]
+prot_ed_s <- prot_ed[,c(1,38,41)]
+colnames(prot_ned_s) <- cn
+colnames(prot_ed_s) <- cn
+
+prot_hl <- rbind(prot_ned_s, prot_ed_s)
+prot_hl
+
+median(na.omit(as.numeric(prot_hl$Half_life)))
+median(prot_hl$Half_life)
+```
+
+```{r}
+
+#previously excluded >300h, what could be better way to deal with it?
+filter(prot_hl, Half_life=="> 300") #422 such proteins, so
+
+
+#can comment out later - what if run with 301 insaread of >300 - not accurate of course but in non-parametric tests/medians could be ok?
+prot_hl <- mutate(prot_hl, Half_life = replace(Half_life, Half_life=="> 300", "301"))
+median(as.numeric(prot_hl$Half_life))
+
+#make numeric; have >300h half-life for some proteins that because of > gets converted to NAs - will be just excluded from correlations, fine for now
+prot_hl$Half_life <- as.numeric(prot_hl$Half_life)
+prot_hl
+
+
+```
+
+
+```{r}
+
+WT_all_hl <- merge(WT_data, prot_hl, by="Uniprot_ID")
+CKO_all_hl <- merge(CKO_data, prot_hl, by="Uniprot_ID")
+
+#rhythmic and non-rhythmic without amplitude cutoff
+#WT_rhy <- subset(WT_all_hl, pVal<0.05)
+#CKO_rhy <- subset(CKO_all_hl, pVal<0.05)
+#WT_nonrhy <- subset(WT_all_hl, pVal>0.05)
+#CKO_nonrhy <- subset(CKO_all_hl, pVal>0.05)
+
+
+#or with amplitude cutoff? doesn't seem to make a difference actually for the subset of those that have half-life info
+WT_rhy <- subset(WT_all_hl, WT_all_hl$Uniprot_ID %in% WT_rhy_RAcutoff$Uniprot_ID)
+CKO_rhy <- subset(CKO_all_hl, CKO_all_hl$Uniprot_ID %in% CKO_rhy_RAcutoff$Uniprot_ID)
+WT_nonrhy <- subset(WT_all_hl, !WT_all_hl$Uniprot_ID %in% WT_rhy_RAcutoff$Uniprot_ID)
+CKO_nonrhy <- subset(CKO_all_hl, !CKO_all_hl$Uniprot_ID %in% CKO_rhy_RAcutoff$Uniprot_ID)
+
+```
+
+```{r}
+#merge rhythmicity and half-life data
+WT_rhy_hl <- merge(WT_rhy, prot_hl, by="Uniprot_ID")
+WT_rhy_hl
+
+CKO_rhy_hl <- merge(CKO_rhy, prot_hl, by="Uniprot_ID")
+CKO_rhy_hl #although CKO for sure have proteostasis defects, so half-lives would be altered -> probably even less valid to use this dataset
+
+
+
+#also calculate again baseline (=average abundance across timepoints)
+WT_rhy_hl$Baseline <- rowMeans(WT_rhy_hl[,8:31])
+CKO_rhy_hl$Baseline <- rowMeans(CKO_rhy_hl[,8:31])
+WT_all_hl$Baseline <- rowMeans(WT_all_hl[,8:31])
+CKO_all_hl$Baseline <- rowMeans(CKO_all_hl[,8:31])
+
+                  
+```
+
+
+```{r}
+#NEW- boxplots, with logged y axis; way overengineered and annoyingly made for colors, tried to match the transparent plots of abundance in the first place...
+
+colours <- c("WT Rhythmic" = "#FBC985", "WT Not Rhythmic" = "#78709A", "CKO Rhythmic" = "#F08D71", "CKO Not Rhythmic" = "#7D9670")
+
+#theme
+axis_text_size = 12
+axis_label_size = 13
+plottheme <- theme( # make it look nice
+  panel.border = element_blank(),  
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  axis.line = element_line(colour = "black"),
+  axis.text=element_text(colour="black", size = axis_text_size),
+  axis.title = element_text(colour = "black", size = axis_label_size))
+
+#change for non-rhythmic as before??
+CKO <- ggplot() +
+    geom_boxplot(aes("rhythmic", CKO_rhy$Half_life, fill="CKO Rhythmic")) +
+    geom_boxplot(aes("non-rhythmic", CKO_nonrhy$Half_life, , fill="CKO Not Rhythmic")) + plottheme + scale_y_continuous(trans='log2') + labs(title="CKO rhythmicity vs protein half-life", y="Half-life, hours (log2 scale)", x="") + scale_fill_manual(name = "", values = colours) + theme(legend.position = "none")
+
+wilcox.test(CKO_rhy$Half_life, CKO_nonrhy$Half_life, paired = F) #p<0.0001
+
+WT <- ggplot() +
+    geom_boxplot(aes("rhythmic", WT_rhy$Half_life, fill="WT Rhythmic")) +
+    geom_boxplot(aes("non-rhythmic", WT_nonrhy$Half_life, fill="WT Not Rhythmic")) + plottheme + scale_y_continuous(trans='log2') + labs(title="WT rhythmicity vs protein size", y="Half-life, hours (log2 scale)", x="") + scale_fill_manual(name = "", values = colours) + theme(legend.position = "none")
+
+wilcox.test(WT_rhy$Half_life, WT_nonrhy$Half_life, paired = F) #p=0.01862
+
+median(WT_rhy$Half_life) #43h
+median(WT_nonrhy$Half_life) #34h
+
+p <- grid.arrange(WT, CKO, nrow=1)
+ggsave(plot=p, "WT and CKO rhy vs nonrhy half-life.png", width=8, height = 5)
+
+
+```
+
+
+
+
+
+
+
+```{r}
+#NEW - now do correlations with rel amp, but for that again remove the "301" ones as will look weird
+prot_hl2 <- filter(prot_hl, Half_life<=300)
+
+WT_rhy_RAhl <- merge(WT_rhy_RAcutoff, prot_hl2, by="Uniprot_ID")
+CKO_rhy_RAhl <- merge(CKO_rhy_RAcutoff, prot_hl2, by="Uniprot_ID")
+
+
+
+ggplot(WT_rhy_RAhl, aes(x=WT_Relative_amplitudes, y=Half_life)) + geom_point() + geom_smooth(method=lm) + plottheme + scale_y_continuous(trans='log2') + scale_x_continuous(trans='log2') + labs(title="WT", y="Half-life, hours (log2 scale)", x="Relative amplitude of abundance oscillation (log2 scale)")
+
+#same thing but with funcion and stats
+correlate_pretty <- function(data, x1, y1) {
+  m <- cor.test(x1, y1, method = "spearman")
+  ggplot(data, aes(x = x1, y = y1)) +
+  scale_y_continuous(trans='log2') + 
+  scale_x_continuous(trans='log2') +
+  geom_point() + 
+  geom_smooth(method=lm) +
+  labs(subtitle = paste("rho = ", format(round(m$estimate, 3), nsmall = 2), ", ",
+                     "p = ", format(round(m$p.value, 4), nsmall = 2)))+
+    plottheme
+}
+
+WT2 <- correlate_pretty(WT_rhy_RAhl, WT_rhy_RAhl$WT_Relative_amplitudes, WT_rhy_RAhl$Half_life) + labs(title="WT", y="Half-life, hours (log2 scale)", x="Relative amplitude (log2 scale)")
+CKO2 <- correlate_pretty(CKO_rhy_RAhl, CKO_rhy_RAhl$CKO_Relative_amplitudes, CKO_rhy_RAhl$Half_life) + labs(title="CKO", y="Half-life, hours (log2 scale)", x="Relative amplitude (log2 scale)")
+
+
+p <- grid.arrange(WT2, CKO2, nrow=1)
+ggsave(plot=p, "WT and CKO RA vs half-life.png", width=10, height = 4)
+
+
+#previous boxplots and correlations together
+p2 <- grid.arrange(WT2, CKO2, WT, CKO, nrow=2)
+ggsave(plot=p2, "WT and CKO half-life 4 plots.png", width=12, height = 9)
+
+```
+
+
+
+```{r}
+#save useful files
+write.csv(WT_rhy_hl, "rhythmic WT halflives.csv", row.names = F)
+write.csv(CKO_rhy_hl, "rhythmic CKO halflives.csv", row.names = F)
+write.csv(WT_all_hl, "all WT halflives.csv", row.names = F)
+write.csv(CKO_all_hl, "all CKO halflives.csv", row.names = F)
+
+```
+

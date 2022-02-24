@@ -1,0 +1,98 @@
+---
+title: "Disorder (IDR predictions) vs rhythmicity DRAFTS"
+subtitle: ""
+output: html_notebook
+---
+
+
+```{r}
+#setup
+
+#clear your workspace
+rm(list=ls())
+
+#Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+if (!require("tools")) {
+  install.packages("tools", dependencies = TRUE)
+  library(tools)
+}
+
+#read the RAIN results (from independent analysis), the calculated disorder, and merge
+WT_res <- read.csv("WT RAIN corrected ID.csv", stringsAsFactors = FALSE)
+disorder <- read.csv("all disorder.csv", stringsAsFactors = FALSE)
+
+WT_all <- merge(WT_res, disorder, by="Uniprot_ID")
+
+#same for CKO
+CKO_res <- read.csv("CKO RAIN corrected ID.csv", stringsAsFactors = FALSE)
+CKO_all <- merge(CKO_res, disorder, by="Uniprot_ID")
+
+#create rhythmic & nonrhythmic subsets
+WT_rhy <- subset(WT_all, pVal<0.05)
+CKO_rhy <- subset(CKO_all, pVal<0.05)
+WT_nonrhy <- subset(WT_all, pVal>0.05)
+CKO_nonrhy <- subset(CKO_all, pVal>0.05)
+```
+
+
+
+
+```{r}
+#NEW- boxplots, with logged y axis; way overengineered and annoyingly made for colors, tried to match the transparent plots of abundance in the first place...
+
+colours <- c("WT Rhythmic" = "#FBC985", "WT Not Rhythmic" = "#78709A", "CKO Rhythmic" = "#F08D71", "CKO Not Rhythmic" = "#7D9670")
+#theme
+axis_text_size = 12
+axis_label_size = 13
+plottheme <- theme( # make it look nice
+  panel.border = element_blank(),  
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  axis.line = element_line(colour = "black"),
+  axis.text=element_text(colour="black", size = axis_text_size),
+  axis.title = element_text(colour = "black", size = axis_label_size))
+
+#eg
+CKO_ndis <- ggplot() +
+    geom_boxplot(aes("rhythmic", CKO_rhy$nDisorder, fill="CKO Rhythmic")) +
+    geom_boxplot(aes("non-rhythmic", CKO_nonrhy$nDisorder, , fill="CKO Not Rhythmic")) + plottheme + scale_y_continuous(trans='log2') + labs(title="CKO", y="Disorder amount, number of aa  (log2 scale)", x="") + scale_fill_manual(name = "", values = colours) + theme(legend.position = "none")
+CKO_ndis
+wilcox.test(CKO_rhy$nDisorder, CKO_nonrhy$nDisorder, paired=F) #p<0.0001
+
+WT_ndis <- ggplot() +
+    geom_boxplot(aes("rhythmic", WT_rhy$nDisorder, fill="WT Rhythmic")) +
+    geom_boxplot(aes("non-rhythmic", WT_nonrhy$nDisorder, , fill="WT Not Rhythmic")) + plottheme + scale_y_continuous(trans='log2') + labs(title="WT", y="Disorder amount, number of aa  (log2 scale)", x="") + scale_fill_manual(name = "", values = colours) + theme(legend.position = "none")
+WT_ndis
+wilcox.test(WT_rhy$nDisorder, WT_nonrhy$nDisorder, paired=F) #p=0.0087
+
+CKO_disin <- ggplot() +
+    geom_boxplot(aes("rhythmic", CKO_rhy$Disorder_index, fill="CKO Rhythmic")) +
+    geom_boxplot(aes("non-rhythmic", CKO_nonrhy$Disorder_index, , fill="CKO Not Rhythmic")) + plottheme + labs(title="CKO", y="Disorder index", x="") + scale_fill_manual(name = "", values = colours) + theme(legend.position = "none") + ylim(0,0.6)
+CKO_disin
+wilcox.test(CKO_rhy$Disorder_index, CKO_nonrhy$Disorder_index, paired=F) #p<0.0001
+
+
+WT_disin <- ggplot() +
+    geom_boxplot(aes("rhythmic", WT_rhy$Disorder_index, fill="WT Rhythmic")) +
+    geom_boxplot(aes("non-rhythmic", WT_nonrhy$Disorder_index, , fill="WT Not Rhythmic")) + plottheme + labs(title="WT", y="Disorder index", x="") + scale_fill_manual(name = "", values = colours) + theme(legend.position = "none") + ylim(0,0.6)
+WT_disin
+wilcox.test(WT_rhy$Disorder_index, WT_nonrhy$Disorder_index, paired=F) #p=0.0011
+
+p <- grid.arrange(WT_ndis, CKO_ndis, WT_disin, CKO_disin, nrow=2)
+
+ggsave(plot=p, "WT and CKO rhy vs nonrhy disorder boxplots NEW.png", width=9, height = 9)
+
+
+```

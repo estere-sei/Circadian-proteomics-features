@@ -1,0 +1,147 @@
+---
+title: "Size vs rhythmicity, proteome"
+subtitle: "Take protein size (=length, number of amino acids) to compare to presence/absence of rhythmicity; some drafts"
+output: html_notebook
+---
+
+```{r}
+#setup
+#clear your workspace
+rm(list=ls())
+
+#Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("ggplot2")) {
+  install.packages("ggplot2", dependencies = TRUE)
+  library(ggplot2)
+}
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+
+#read the RAIN files from INDPENDENT analysis
+WT_RAIN <- read.csv("WT RAIN corrected ID.csv", stringsAsFactors = F)
+CKO_RAIN <- read.csv("CKO RAIN corrected ID.csv", stringsAsFactors = F)
+
+
+#read Length info - already calculated in disorder analysis uniprot script; add the info
+all_length <- read.csv("all detected Length.csv", stringsAsFactors = F)
+all_length <- na.omit(all_length)
+colnames(all_length) <- c("Uniprot_ID", "Length")
+
+WT_all <- merge(WT_RAIN, all_length, by = "Uniprot_ID")
+WT_all
+CKO_all <- merge(CKO_RAIN, all_length, by = "Uniprot_ID")
+
+
+WT_all$Baseline <- rowMeans(WT_all[,8:31])
+CKO_all$Baseline <- rowMeans(CKO_all[,8:31])
+
+#create rhythmic & nonrhythmic subsets
+WT_rhy <- subset(WT_all, pVal<0.05)
+CKO_rhy <- subset(CKO_all, pVal<0.05)
+WT_nonrhy <- subset(WT_all, pVal>0.05)
+CKO_nonrhy <- subset(CKO_all, pVal>0.05)
+
+
+
+#briefly check how logged and not-logged data length looks; whetehr it's normally distrubted - no, even the log-transformed are not
+ggplot(WT_nonrhy, aes(x = log10(Length))) + 
+  geom_histogram(binwidth = 0.1) +
+  labs(title = "WT_rhy")
+
+shapiro.test(log10(CKO_rhy$Length))
+
+shapiro.test(log10(WT_rhy$Length))
+
+```
+
+```{r}
+#create function for plotting and testing distributions
+
+#set colours
+colours <- c("WT Rhythmic" = "orange", "WT Not Rhythmic" = "navy", "CKO Rhythmic" = "red", "CKO Not Rhythmic" = "dark green", "WT Random"="orange", "CKO Random"="red", "WT Background" = "navy", "CKO Background" = "dark green")
+
+#theme
+axis_text_size = 12
+axis_label_size = 13
+plottheme <- theme( # make it look nice
+  panel.border = element_blank(),  
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  axis.line = element_line(colour = "black"),
+  axis.text=element_text(colour="black", size = axis_text_size),
+  axis.title = element_text(colour = "black", size = axis_label_size))
+
+
+#function
+probability_plots <- function(x1, x2, n1, n2, xn) {
+  tt <- t.test(log10(x1), log10(x2), paired = F) #not sure if can perform a non-param test
+  pd <- ggplot() + 
+    geom_density(aes(x = log10(x1), fill = n1),
+                color = "black", alpha = 0.5) +
+    geom_density(aes(x = log10(x2), fill = n2),
+               color = "black", alpha = 0.5) +
+  scale_fill_manual(name = "", values = colours) +
+  labs(x =xn, subtitle = paste("t-test p-val: ", format(round(tt$p.value,4))), y = "Probability density")
+  st <- ks.test(x1, x2)
+  cp <- ggplot() +
+    geom_step(aes(x=log10(x1), colour = n1), stat="ecdf") + 
+    geom_step(aes(x=log10(x2), colour = n2), stat="ecdf") + 
+    scale_color_manual(name = "", values = colours) +
+    labs(subtitle = paste("KS test p-val: ", format(round(st$p.value,4))), y="Cumulative probability", x=xn)
+grid.arrange(pd, cp, nrow=2)
+} 
+
+```
+
+
+```{r}
+#NEW- boxplots, with logged y axis; way overengineered and annoyingly made for colors, tried to match the transparent plots of abundance in the first place...
+
+colours <- c("WT Rhythmic" = "#FBC985", "WT Not Rhythmic" = "#78709A", "CKO Rhythmic" = "#F08D71", "CKO Not Rhythmic" = "#7D9670")
+
+CKO <- ggplot() +
+    geom_boxplot(aes("rhythmic", CKO_rhy$Length, fill="CKO Rhythmic")) +
+    geom_boxplot(aes("non-rhythmic", CKO_nonrhy$Length, , fill="CKO Not Rhythmic")) + plottheme + scale_y_continuous(trans='log2') + labs(title="CKO rhythmicity vs protein size", y="Size, number of amino acids (log2 scale)", x="") + scale_fill_manual(name = "", values = colours) + theme(legend.position = "none")
+
+WT <- ggplot() +
+    geom_boxplot(aes("rhythmic", WT_rhy$Length, fill="WT Rhythmic")) +
+    geom_boxplot(aes("non-rhythmic", WT_nonrhy$Length, fill="WT Not Rhythmic")) + plottheme + scale_y_continuous(trans='log2') + labs(title="WT rhythmicity vs protein size", y="Size, number of amino acids (log2 scale)", x="") + scale_fill_manual(name = "", values = colours) + theme(legend.position = "none")
+
+p <- grid.arrange(WT, CKO, nrow=1)
+ggsave(plot=p, "WT and CKO rhy vs nonrhy size.png", width=8, height = 5)
+
+
+#rhythmis vs non-rhythmic, for both WT and CKO separately
+
+WT_rvbg <- probability_plots(WT_rhy$Length, WT_nonrhy$Length, "WT Rhythmic", "WT Not Rhythmic", "Log10(Length)") 
+
+#checking actual median values - median difference 4 residues, not significant
+median(WT_rhy$Length) #459
+median(WT_nonrhy$Length) #463
+
+CKO_rvbg <- probability_plots(CKO_rhy$Length, CKO_nonrhy$Length, "CKO Rhythmic", "CKO Not Rhythmic", "Log10(Length)")
+
+#median differences 53 residues, v significant! not sure why...
+median(CKO_rhy$Length) #424
+median(CKO_nonrhy$Length) #477
+
+t.test(log10(CKO_rhy$Length), log10(CKO_nonrhy$Length),paired = F)
+#really? significant difference? do another test - Mann Whitney U, also v significant
+wilcox.test(CKO_rhy$Length, CKO_nonrhy$Length,paired = F)
+
+
+p <- grid.arrange(WT_rvbg, CKO_rvbg, nrow=1)
+#ggsave(plot=p, "WT and CKO rhy vs nonrhy size.png", width=8, height = 5)
+
+
+```

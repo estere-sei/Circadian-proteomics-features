@@ -1,0 +1,88 @@
+---
+title: "Uniprot - getting protein length (=size, number of amino acids) only!"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+#setup
+
+#clear your workspace
+rm(list=ls())
+
+#Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+if (!require("UniProt.ws")) {
+  BiocManager::install("UniProt.ws")
+  library(UniProt.ws)
+}
+
+if (!require("tools")) {
+  install.packages("tools", dependencies = TRUE)
+  library(tools)
+}
+
+#make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+X
+
+#load all proteins detected in WT and CKO separately, their corrected IDs - got from Main Uniprot ID script, originally written for half-life
+all_detected <- read.csv("all main ids.csv", stringsAsFactors = F)
+
+all_detected
+
+# Load the mus musculus dataset
+up <- UniProt.ws(taxId=10090)
+
+```
+
+
+```{r}
+# Test make data frames for background + common proteins length
+
+#keys <- background
+columns <- c("LENGTH")
+#keytypes
+kt <- "UNIPROTKB"
+
+
+background_input <- all_detected$Uniprot_ID
+
+#create empty dataframe so can add onto it
+background_results <- data.frame(UNIPROTKB = as.character(), LENGTH = as.numeric() )
+names(background_results) <- c("UNIPROTKB", "LENGTH")
+
+#doing in batches of 100, because the API can't process all 1000s at once
+
+
+#calculate how I can divide the dataset in batches of 100, so can do uniprot.ws::select
+m = length(background_input) %% 100
+l = length(background_input) %/% 100
+
+
+
+#loop through the batches of 100 + the remainder
+for (i in (1:l)) {
+  a = i*100
+  b = ((i-1)*100)+1
+  background_results_subset <- select(up, background_input[b:a], columns, kt)
+  background_results <- rbind(background_results, background_results_subset)
+}
+background_results_subset <- select(up, background_input[((l*100)+1):((l*100)+m)], columns, kt)
+background_results <- rbind(background_results, background_results_subset)
+
+#double-check
+summary(background_results)
+length(background_input)
+
+write.csv(background_results, "all detected length.csv", row.names = F)
+
+```
+

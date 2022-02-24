@@ -1,0 +1,135 @@
+---
+title: "Disorder calculation, now with corrected IDs"
+subtitle2: "For all proteins from DW proteomics - deteceted in WT and CKO separately; PYTHON CODE NEEDED TO GET DISORDER INFO FILE FOR EACH PROTEIN"
+output: html_notebook
+---
+
+
+```{r}
+#setup
+
+#clear your workspace
+rm(list=ls())
+
+#Load useful packages
+
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+}
+
+
+if (!require("tools")) {
+  install.packages("tools", dependencies = TRUE)
+  library(tools)
+}
+
+#make a list of all the .csv files in your working directory just so you can see what's going on
+X = list.files(".",".csv")
+X
+
+#load all proteins detected in WT and CKO separately, their corrected IDs - got from Main Uniprot ID script, originally written for half-life
+all_detected <- read.csv("all detected length.csv", stringsAsFactors = F)
+
+all_detected
+
+```
+
+
+
+```{r}
+# See the D2P2 output files
+
+#don't forget to change the paths! call background historically
+path <- getwd()
+path2 <- paste0(path, "/all_WTCKO_disorder_files")
+
+background_files <- list.files(path=path2, 
+                    pattern="*.out", 
+                    full.names=TRUE, 
+                    recursive=FALSE)
+
+summary(background_files)
+```
+
+
+```{r}
+# Create functions for calculating disorder index
+# a = the D2P2 consensus output file
+# b = the dataframe containing protein lengths from Uniprot.ws
+# e.g.:
+#       a = files[6]
+#       b = res_rhythmic
+
+disordercalc <- function(a, b){
+  protein <- read.table(a)
+  protein_name <- strsplit(basename(a), "_")[[1]][1]
+  ndisorder <- sum(apply(protein, 1, function(x) x[2]-x[1] + 1))
+  length <- as.numeric(b[which(b$UNIPROTKB %in% protein_name),2])
+  disorder_index = ndisorder / length
+  return(disorder_index)
+}
+
+ndisorder <- function(a){
+  protein <- read.table(a)
+  protein_name <- strsplit(basename(a), "_")[[1]][1]
+  ndisorder <- sum(apply(protein, 1, function(x) x[2]-x[1] + 1))
+  return(ndisorder)
+}
+
+```
+
+```{r}
+# Disorder index calculation for all the D2P2 output files
+
+# Create empty dataframes
+background_disorder <- data.frame(Uniprot_ID = character(),
+                      Disorder_index = as.numeric(),
+                      nDisorder = as.numeric(),
+                      stringsAsFactors=FALSE)
+
+#example on one protein
+protein<-read.table(background_files[111])
+protein
+disordercalc(background_files[111], all_detected)
+ndisorder(background_files[111])
+
+
+#missing seq lists - don't forget to delete ":" before id, manually by replace in txt or in d2p2 code
+bkgr_missing_seq <- as.vector(read.table("missing_seqids.txt",stringsAsFactors=FALSE))$V3
+bkgr_missing_seq
+length(bkgr_missing_seq) #much fewer than before - corrected IDs helped
+
+
+#fixed indexing and fixed zeroes
+for (i in 1:length(background_files)) {
+  upid <- strsplit(basename(background_files[i]), "_")[[1]][1]
+  if (upid %in% bkgr_missing_seq) next
+  if (file.info(background_files[i])$size == 0) {
+  background_disorder[i,1] <- upid
+  background_disorder[i,2] <- 0
+  background_disorder[i,3] <- 0 }
+  else {
+  background_disorder[i,1] <- upid
+  background_disorder[i,2] <- disordercalc(background_files[i], all_detected)
+  background_disorder[i,3] <- ndisorder(background_files[i]) 
+  }
+}
+
+background_disorder <- na.omit(background_disorder)
+
+background_disorder
+
+
+```
+
+
+
+
+```{r}
+# Write csv files
+
+write.csv(background_disorder, "all disorder.csv", row.names = F)
+
+```
+

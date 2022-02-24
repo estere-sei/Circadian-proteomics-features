@@ -1,0 +1,223 @@
+---
+title: "Average abundance vs rhythmicity, proteome, combined analysis"
+subtitle: "."
+output: html_notebook
+---
+
+```{r}
+#setup
+#clear your workspace
+rm(list=ls())
+
+#Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("ggplot2")) {
+  install.packages("ggplot2", dependencies = TRUE)
+  library(ggplot2)
+}
+
+if (!require("plyr")) {
+  install.packages("plyr", dependencies = TRUE)
+  library(plyr)
+}
+
+
+if (!require("gridExtra")) {
+  install.packages("gridExtra", dependencies = TRUE)
+  library(gridExtra)
+}
+
+
+#read the RAIN files from COMBINED analysis - because may want to compare between them
+WT_all <- read.csv("WT_RAIN_combinedanalysis.csv", stringsAsFactors = F)
+CKO_all <- read.csv("CKO_RAIN_combinedanalysis.csv", stringsAsFactors = F)
+
+
+#calculate baseline (=average abundance in all timepoints)
+WT_all$Baseline <- rowMeans(WT_all[,8:31])
+CKO_all$Baseline <- rowMeans(CKO_all[,8:31])
+
+#create rhythmic & nonrhythmic subsets
+WT_rhy <- subset(WT_all, pVal<0.05)
+CKO_rhy <- subset(CKO_all, pVal<0.05)
+WT_nonrhy <- subset(WT_all, pVal>0.05)
+CKO_nonrhy <- subset(CKO_all, pVal>0.05)
+
+WT_rhy
+CKO_rhy
+
+
+```
+
+```{r}
+#create function for plotting and testing distributions
+
+#set colours
+colours <- c("WT Rhythmic" = "orange", "WT Not Rhythmic" = "navy", "CKO Rhythmic" = "red", "CKO Not Rhythmic" = "dark green")
+
+#theme
+axis_text_size = 12
+axis_label_size = 12
+plottheme <- theme( # make it look nice
+  panel.border = element_blank(),  
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  axis.line = element_line(colour = "black"),
+  axis.text=element_text(colour="black", size = axis_text_size),
+  axis.title = element_text(colour = "black", size = axis_label_size))
+
+
+
+
+#function
+probability_plots_old <- function(x1, x2, n1, n2, xn) {
+  tt <- t.test(log10(x1), log10(x2), paired = F)
+  pd <- ggplot() + 
+    geom_density(aes(x = log10(x1), fill = n1),
+                color = "black", alpha = 0.5) +
+    geom_density(aes(x = log10(x2), fill = n2),
+               color = "black", alpha = 0.5) +
+  scale_fill_manual(name = "", values = colours, drop=TRUE) +
+  labs(x =xn, subtitle = paste("t-test p-val: ", format(round(tt$p.value,4))), y = "Probability density")
+  st <- ks.test(x1, x2)
+  cp <- ggplot() +
+    geom_step(aes(x=log10(x1), colour = n1), stat="ecdf") + 
+    geom_step(aes(x=log10(x2), colour = n2), stat="ecdf") + 
+    scale_color_manual(name = "", values = colours) +
+    labs(subtitle = paste("KS test p-val: ", format(round(st$p.value,4))), y="Cumulative probability", x=xn)
+grid.arrange(pd, cp, nrow=2)
+} 
+
+probability_plots <- function(x1, x2, n1, n2, xn) {
+  tt <- t.test(log10(x1), log10(x2), paired = F)
+  pd <- ggplot() + 
+    geom_density(aes(x = log10(x1), fill = n1),
+                color = "black", alpha = 0.5) +
+    geom_density(aes(x = log10(x2), fill = n2),
+               color = "black", alpha = 0.5) +
+  scale_fill_manual(name = "", values = colours, drop=TRUE) +
+  labs(x =xn, subtitle = paste("t-test p-val: ", format(round(tt$p.value,4))), y = "Probability density") +
+  plottheme
+} 
+
+
+boxplot_pretty <- function(x1, x2, x3, ny, nx) {
+  mwu <- wilcox.test(x1, x3, paired=F)
+  ggplot() +
+    geom_boxplot(aes("temp up osmo down", x1)) +
+    geom_boxplot(aes("temp down osmo up", x2)) +
+  labs(y=ny, x=nx, subtitle = paste("tupodown vs all MW p-val: ", format(round(mwu$p.value,4)))) }
+     
+```
+
+
+```{r}
+
+#rhythmis vs non-rhythmic, for both WT and CKO separately
+
+WT_rvbg <- probability_plots(WT_rhy$Baseline, WT_nonrhy$Baseline, "WT Rhythmic", "WT Not Rhythmic", "Log10(Average abundance)") 
+
+#checking actual medin values
+median(WT_rhy$Baseline)
+median(WT_all$Baseline)
+
+CKO_rvbg <- probability_plots(CKO_rhy$Baseline, CKO_nonrhy$Baseline, "CKO Rhythmic", "CKO Not Rhythmic", "Log10(Average abundance)")
+
+p <- grid.arrange(WT_rvbg, CKO_rvbg, nrow=1)
+ggsave(plot=p, "WT and CKO rhy vs nonrhy abundance.png", width=8, height = 5)
+
+
+
+
+```
+
+```{r}
+#now test WT against CKO
+
+#all rhythmic in one vs other 
+WTvsCKO_r <- probability_plots(WT_rhy$Baseline, CKO_rhy$Baseline, "WT Rhythmic", "CKO Rhythmic", "Log10(Baseline)")
+
+#just all - though a better test later, when paired
+WTvsCKO_bg <- probability_plots(WT_all$Baseline, CKO_all$Baseline, "WT Background", "CKO Background", "Log10(Baseline)")
+
+#merge data to create paired samples
+WTandCKO <- merge(WT_all, CKO_all, by="Uniprot_ID")
+WTandCKO <- WTandCKO[,c("Uniprot_ID", "pVal.x", "pVal.y", "Baseline.x", "Baseline.y")]
+colnames(WTandCKO) <- c("Uniprot_ID", "pVal.WT", "pVal.CKO", "Baseline.WT", "Baseline.CKO")
+WTandCKO
+
+WC_rhy <- merge(WT_rhy, CKO_rhy, by="Uniprot_ID")
+WC_rhy <- WC_rhy[,c("Uniprot_ID", "pVal.x", "pVal.y", "Baseline.x", "Baseline.y")]
+colnames(WC_rhy) <- c("Uniprot_ID", "pVal.WT", "pVal.CKO", "Baseline.WT", "Baseline.CKO")
+WC_rhy
+
+
+#now again, all WT vs all CKO but paired
+wilcox.test(WTandCKO$Baseline.WT, WTandCKO$Baseline.CKO, paired=TRUE) #p=0.6
+t.test(log10(WTandCKO$Baseline.WT), log10(WTandCKO$Baseline.CKO), paired=TRUE) #p=0.2
+
+median(WT_all$Baseline)
+median(CKO_all$Baseline)
+
+#in proteins rhythmic in both, is there a difference 
+wilcox.test(WC_rhy$Baseline.WT, WC_rhy$Baseline.CKO, paired=TRUE) #p=0.009
+t.test(log10(WC_rhy$Baseline.WT), log10(WC_rhy$Baseline.CKO), paired=TRUE) #p=0.0003
+
+median(WC_rhy$Baseline.WT)
+median(WC_rhy$Baseline.CKO)
+
+
+#accidentally noticed
+wilcox.test(WC_rhy$pVal.WT, WC_rhy$pVal.CKO, paired=TRUE) 
+median(WC_rhy$pVal.WT)
+median(WC_rhy$pVal.CKO) #interesting, this is much lower; easier to detect rhythms, so RAIN is more confident - due to increase in abundance? 
+
+```
+
+
+```{r}
+#compare rhythmic in CKO-only or WT-only
+
+CKO_only_rhy <- subset(WTandCKO, pVal.CKO < 0.05)
+CKO_only_rhy
+
+wilcox.test(CKO_only_rhy$Baseline.CKO, CKO_only_rhy$Baseline.WT, paired = TRUE) #p<0.0001
+t.test(log10(CKO_only_rhy$Baseline.CKO), log10(CKO_only_rhy$Baseline.WT), paired=TRUE) #p<0.0001
+
+cko_onlyrhy <- probability_plots(CKO_only_rhy$Baseline.CKO, CKO_only_rhy$Baseline.WT, "CKO Rhythmic", "WT Not Rhythmic", "Log10(Average abundance)")
+cko_onlyrhy
+
+ggplot() +
+    geom_boxplot(aes("CKO", log10(CKO_only_rhy$Baseline.CKO))) +
+    geom_boxplot(aes("WT", log10(CKO_only_rhy$Baseline.WT))) + plottheme
+
+median(CKO_only_rhy$Baseline.WT)
+median(CKO_only_rhy$Baseline.CKO)
+
+
+WT_only_rhy <- subset(WTandCKO, pVal.WT < 0.05)
+WT_only_rhy
+
+wilcox.test(WT_only_rhy$Baseline.CKO, WT_only_rhy$Baseline.WT, paired = TRUE) #p=0.15
+t.test(log10(WT_only_rhy$Baseline.CKO), log10(WT_only_rhy$Baseline.WT), paired=TRUE) #p=0.2
+
+median(WT_only_rhy$Baseline.WT)
+median(WT_only_rhy$Baseline.CKO)
+
+```
+
+
+
+```{r}
+#export csv
+
+write.csv(WTandCKO, "WT and CKO all compare baseline.csv", row.names = F)
+write.csv(WC_rhy, "WT and CKO rhytmic compare baseline.csv", row.names = F)
+write.csv(CKO_only_rhy, "CKO-only rhythmic compare baseline.csv", row.names = F)
+
+```

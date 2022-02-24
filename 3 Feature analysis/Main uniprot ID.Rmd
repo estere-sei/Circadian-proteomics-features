@@ -1,0 +1,105 @@
+---
+title: "Finding main uniprot ID from Maxquant/Perseus file"
+output: html_notebook
+---
+
+```{r}
+#setup
+#clear your workspace
+rm(list=ls())
+
+#Load useful packages
+if (!require("tidyverse")) {
+  install.packages("tidyverse", dependencies = TRUE)
+  library(tidyverse)
+} 
+
+if (!require("rlang")) {
+  install.packages("rlang", dependencies = TRUE)
+  library(rlang)
+} 
+
+library(gridExtra)
+
+
+
+# read the input file
+data <- read.csv("CKO_RAIN_results.csv", stringsAsFactors = F)
+
+#the problem was discovered when trying to match DW proteomics with other datasets, such as the complexes database - the Uniprot_ID in the former, which is the first out of the list from raw Persues output files, is not actually the main Uniprot ID. Example - proteasome
+
+data[data$Gene_names %in% "Psmb1",] #Q6RI64 is not actually the main id, in uniprot it is listed an unreviewed, and it doesn't match the ID e.g. in CORUM complexes database; O09061 is the main ("reviewed") one
+
+```
+
+```{r}
+#copy all ids from raw Perseus files, unlist them, and put in a dataframe so can later find the main one
+
+all_ids <- read.csv("all_ids.csv", stringsAsFactors = F)
+all_ids
+
+li1 <- vector("list", nrow(all_ids))
+for (i in 1:length(li1)) {
+  li1[i] <- strsplit(all_ids[i, 1], ";")
+}
+li2 <- unlist(lapply(li1, head, n=1L))
+
+all_ids$first <- li2
+
+data$All_ids <- all_ids[which(all_ids$first %in% data$Uniprot_ID),1]
+#Do first_id again, so can then replace the main id in the first column
+data$First_id <- all_ids[which(all_ids$first %in% data$Uniprot_ID),2]
+data
+
+
+
+```
+
+
+
+```{r}
+#now find which of the ids in main - i.e. reviewed on Uniprot - do it manually by copying the list of _all_ ids into ID/reference mapping tool on uniprot website, selecting only reviewed ones, and exporting the list
+
+uniprot_all <- read_tsv("uniprot-all-reviewed.tab")
+reviewed_ids <- uniprot_all$Entry
+reviewed_ids
+
+
+#how the matcjomh works on one example - of the proteasome Psmb1
+eg <- data$All_ids[1522]
+eg_spl <- unlist(strsplit(eg, ";"))
+which(eg_spl %in% reviewed_ids) 
+main_id <- eg_spl[which(eg_spl %in% reviewed_ids)]
+main_id
+
+
+#now go through the data and do this for every protein - FIXED 19/04
+for (i in (1:nrow(data))) {
+  eg_spl <- unlist(strsplit(data$All_ids[i], ";"))
+  if (is_empty(which(eg_spl %in% reviewed_ids)))
+  {
+    main_id <- eg_spl[1]
+  } else {
+  main_id <- eg_spl[which(eg_spl %in% reviewed_ids)[1]]
+  }
+  data$Uniprot_ID[i] <- main_id 
+}
+
+data
+
+#double check
+data[data$Gene_names %in% "Psmb1",] #now correct
+
+
+#write csv
+write.csv(data[,c("Uniprot_ID", "All_ids", "First_id")], "CKO mainid matching.csv", row.names = F)
+write.csv(data, "CKO RAIN corrected ID.csv", row.names = F)
+```
+
+
+```{r}
+
+
+```
+
+
